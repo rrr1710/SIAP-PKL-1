@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import {
     Building2,
@@ -12,7 +13,7 @@ import {
     Map,
 } from 'lucide-vue-next';
 
-defineProps({
+const props = defineProps({
     item: { type: Object, required: true },
     detailHref: { type: String, default: '' },
     primary: { type: Object, default: null },
@@ -31,79 +32,46 @@ const categoryIcons = {
 
 const iconFor = (kategori) => categoryIcons[kategori] || ClipboardList;
 
-const statusMeta = (item) => {
-    const sisa = Number(item.sisa_total ?? 0);
-    const quota = Number(item.kuota_total ?? 0);
-
-    if (sisa <= 0 || quota <= 0) {
-        return {
-            label: 'Kuota Penuh',
-            badge: 'bg-ink-300/25 text-ink-500',
-            bar: 'bg-ink-400',
-        };
-    }
-
-    const sisaPct = (sisa / quota) * 100;
-
-    if (sisaPct > 50) {
-        return {
-            label: 'Slot Tersedia',
-            badge: 'badge-success',
-            bar: 'bg-status-success',
-        };
-    }
-
-    if (sisaPct >= 20) {
-        return {
-            label: 'Kuota Menipis',
-            badge: 'badge-warning',
-            bar: 'bg-gold-500',
-        };
-    }
-
-    return {
-        label: 'Hampir Penuh',
-        badge: 'badge-danger',
-        bar: 'bg-status-danger',
-    };
-};
+const isFull = computed(() => {
+    const sisa = Number(props.item.sisa_total ?? props.item.kuota_sisa ?? 0);
+    const terisi = Number(props.item.terisi_total ?? props.item.kuota_terisi ?? 0);
+    const kuota = Number(props.item.kuota_total ?? props.item.batas_kuota ?? 0);
+    return sisa <= 0 || (kuota > 0 && terisi >= kuota);
+});
 </script>
 
 <template>
     <article class="glass-card flex flex-col gap-5 rounded-3xl p-6 transition hover:-translate-y-1 hover:border-forest-500/40 hover:shadow-card">
         <!-- Header -->
-        <div class="flex items-start justify-between gap-4">
-            <div class="min-w-0">
-                <div class="mb-3 inline-grid h-12 w-12 place-items-center rounded-2xl bg-forest-600/10 text-forest-700">
-                    <component :is="iconFor(item.kategori)" :size="24" :stroke-width="1.8" />
-                </div>
-                <Link
-                    :href="detailHref"
-                    class="font-display text-lg font-bold leading-snug text-ink-900 transition hover:text-forest-700"
-                >
-                    {{ item.nama }}
-                </Link>
-                <p class="mt-1 flex items-center gap-1.5 text-sm text-ink-500">
-                    <Building2 :size="14" :stroke-width="2" class="shrink-0" />
-                    {{ item.instansi }}
-                </p>
+        <div class="flex flex-col items-center text-center gap-3">
+            <div class="inline-grid h-12 w-12 place-items-center rounded-2xl bg-forest-600/10 text-forest-700">
+                <component :is="iconFor(item.kategori)" :size="24" :stroke-width="1.8" />
             </div>
-            <span :class="['badge', statusMeta(item).badge]" class="whitespace-nowrap">
-                {{ statusMeta(item).label }}
-            </span>
+            <Link
+                :href="detailHref"
+                class="font-display text-base font-bold leading-snug text-ink-900 transition hover:text-forest-700"
+            >
+                {{ item.nama }}
+            </Link>
+            <p class="flex items-center justify-center gap-1.5 text-xs text-ink-500">
+                <Building2 :size="13" :stroke-width="2" class="shrink-0" />
+                {{ item.instansi }}
+            </p>
         </div>
 
         <!-- Progress Kuota -->
         <div>
             <div class="flex items-center justify-between text-xs font-medium text-ink-500">
-                <span>{{ item.terisi_total }} / {{ item.kuota_total }} slot terisi</span>
-                <span class="font-semibold text-ink-700">{{ item.persentase }}%</span>
+                <span v-if="Number(item.terisi_total ?? 0) >= Number(item.kuota_total ?? 1)" class="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 font-semibold text-amber-700 border border-amber-200/60">
+                    Kuota Penuh
+                </span>
+                <span v-else>{{ item.terisi_total }} / {{ item.kuota_total }} slot terisi</span>
             </div>
             <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink-100">
                 <div
                     class="h-full rounded-full transition-all duration-500"
-                    :class="statusMeta(item).bar"
-                    :style="{ width: Math.min(100, Number(item.persentase ?? 0)) + '%' }"
+                    :class="Number(item.terisi_total ?? 0) >= Number(item.kuota_total ?? 1) ? 'bg-ink-400' : Number((item.terisi_total / item.kuota_total) * 100) >= 50 ? 'bg-status-success' : 'bg-gold-500'"
+                    :style="{ width: Math.min(100, Math.round((Number(item.terisi_total ?? 0) / Math.max(1, Number(item.kuota_total ?? 1))) * 100)) + '%' }"
                 ></div>
             </div>
         </div>
@@ -125,8 +93,17 @@ const statusMeta = (item) => {
                 Lihat Detail
             </Link>
             <template v-if="primary">
+                <button
+                    v-if="isFull"
+                    disabled
+                    type="button"
+                    class="inline-flex items-center justify-center rounded-xl bg-ink-200/70 px-3 py-2.5 text-xs font-semibold text-ink-400 cursor-not-allowed text-center select-none"
+                    title="Kuota untuk bidang ini sudah penuh"
+                >
+                    Kuota Penuh
+                </button>
                 <a
-                    v-if="primary.external || primary.href?.includes('/auth/')"
+                    v-else-if="primary.external || primary.href?.includes('/auth/')"
                     :href="primary.href"
                     class="btn-primary px-3 py-2.5 text-xs text-center"
                 >

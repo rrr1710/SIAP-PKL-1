@@ -31,19 +31,25 @@ class AdminDashboardController extends Controller
                     ->count(),
             ],
             'pengajuanTerbaru' => (clone $permohonanQuery)
-                ->with(['pemohon', 'subInstansi'])
+                ->with(['pemohon', 'subInstansi', 'anggotaPermohonan'])
                 ->latest()
                 ->limit(5)
                 ->get()
-                ->map(fn (PermohonanPkl $p) => [
-                    'id' => $p->id,
-                    'nama' => $p->pemohon?->nama_lengkap ?? '-',
-                    'nama_pemohon' => $p->pemohon?->nama_lengkap ?? '-',
-                    'posisi' => $p->subInstansi?->nama_sub_instansi ?? '-',
-                    'bidang' => $p->subInstansi?->nama_sub_instansi ?? '-',
-                    'status' => $p->status,
-                    'created_at' => $p->created_at?->format('d M Y'),
-                ]),
+                ->map(function (PermohonanPkl $p) {
+                    $nama = $p->pemohon?->nama_lengkap 
+                        ?? $p->anggotaPermohonan->first()?->nama_mahasiswa 
+                        ?? '-';
+
+                    return [
+                        'id' => $p->id,
+                        'nama' => $nama,
+                        'nama_pemohon' => $nama,
+                        'bidang' => $p->subInstansi?->nama_sub_instansi ?? '-',
+                        'posisi' => $p->subInstansi?->nama_sub_instansi ?? '-',
+                        'status' => $p->status,
+                        'created_at' => $p->created_at?->format('d M Y'),
+                    ];
+                }),
             'bidangAktif' => (clone $subInstansiQuery)
                 ->withCount([
                     'pesertaMagang as terisi' => fn ($q) => $q->where('status_magang', 'aktif'),

@@ -13,6 +13,7 @@ export const getStatusLabel = (status) => {
     switch (status.toLowerCase()) {
         case 'pending':
         case 'diajukan':
+        case 'menunggu':
             return 'Dalam Proses';
         case 'accepted':
         case 'diterima':
@@ -28,6 +29,8 @@ export const getStatusLabel = (status) => {
         case 'completed':
         case 'selesai':
             return 'Selesai';
+        case 'aktif':
+            return 'Aktif';
         default:
             return status;
     }
@@ -39,6 +42,7 @@ export const getStatusBadgeClass = (status) => {
     switch (status.toLowerCase()) {
         case 'pending':
         case 'diajukan':
+        case 'menunggu':
             return 'badge-warning';
         case 'accepted':
         case 'diterima':
@@ -54,6 +58,8 @@ export const getStatusBadgeClass = (status) => {
         case 'completed':
         case 'selesai':
             return 'badge-info';
+        case 'aktif':
+            return 'badge-success';
         default:
             return 'badge-warning';
     }
@@ -80,6 +86,7 @@ export const getTimelineSteps = (pendaftaran) => {
     if (!pendaftaran) return [];
 
     const rawStatus = (pendaftaran.status || 'pending').toLowerCase();
+    const isPending = rawStatus === 'pending' || rawStatus === 'diajukan' || rawStatus === 'menunggu';
     const createdAt = formatDate(pendaftaran.created_at);
     const updatedAt = formatDate(pendaftaran.updated_at || pendaftaran.created_at);
     const endDate = pendaftaran.end_date ? new Date(pendaftaran.end_date) : null;
@@ -93,8 +100,8 @@ export const getTimelineSteps = (pendaftaran) => {
         status: 'completed',
     }, {
         label: 'Verifikasi Admin',
-        date: rawStatus === 'pending' ? 'Dalam proses' : updatedAt,
-        status: rawStatus === 'pending' ? 'in_progress' : 'completed',
+        date: isPending ? 'Dalam proses' : updatedAt,
+        status: isPending ? 'in_progress' : 'completed',
     }];
 
     if (rawStatus === 'rejected' || rawStatus === 'ditolak') {

@@ -1,6 +1,6 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import { getStatusLabel, getStatusBadgeClass, formatDate } from '@/utils/statusLabel';
 
@@ -15,10 +15,19 @@ const statusFilter = ref('');
 const filteredPeserta = computed(() => {
     return props.peserta.filter((item) => {
         const matchSearch = !search.value || item.nama.toLowerCase().includes(search.value.toLowerCase());
-        const matchStatus = !statusFilter.value || item.status === statusFilter.value;
+        const matchStatus = !statusFilter.value || item.status_magang === statusFilter.value;
         return matchSearch && matchStatus;
     });
 });
+
+const completing = ref(null);
+const completeParticipant = (id) => {
+    if (!confirm('Tandai peserta ini sebagai Selesai?')) return;
+    completing.value = id;
+    router.patch(route('admin.peserta.complete', id), {}, {
+        onFinish: () => { completing.value = null; },
+    });
+};
 </script>
 
 <template>
@@ -65,8 +74,8 @@ const filteredPeserta = computed(() => {
                 <div class="w-full md:w-52">
                     <select v-model="statusFilter" class="field-input">
                         <option value="">Semua Status</option>
-                        <option value="accepted">Aktif</option>
-                        <option value="completed">Selesai</option>
+                        <option value="aktif">Aktif</option>
+                        <option value="selesai">Selesai</option>
                     </select>
                 </div>
             </form>
@@ -75,17 +84,17 @@ const filteredPeserta = computed(() => {
         <!-- Peserta Table -->
         <section class="glass-panel p-6 sm:p-8">
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[780px] text-left text-sm">
+                <table class="w-full min-w-[720px] text-left text-sm">
                     <thead class="border-b border-ink-300/35 text-xs uppercase tracking-wider text-ink-500">
                         <tr>
                             <th class="px-4 py-3 w-12">No</th>
                             <th class="px-4 py-3">Nama</th>
                             <th class="px-4 py-3">NIM</th>
-                            <th class="px-4 py-3">Asal Instansi</th>
+                            <th class="px-4 py-3">Asal Sekolah/Instansi</th>
                             <th class="px-4 py-3">Bidang</th>
-                            <th class="px-4 py-3">Posisi</th>
                             <th class="px-4 py-3">Mulai</th>
                             <th class="px-4 py-3">Status</th>
+                            <th class="px-4 py-3 text-right">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-ink-300/20">
@@ -93,14 +102,24 @@ const filteredPeserta = computed(() => {
                             <td class="px-4 py-4 text-ink-500">{{ index + 1 }}</td>
                             <td class="px-4 py-4 font-semibold text-ink-900">{{ item.nama }}</td>
                             <td class="px-4 py-4 text-ink-700">{{ item.nim }}</td>
-                            <td class="px-4 py-4 text-ink-700">{{ item.instansi }}</td>
+                            <td class="px-4 py-4 text-ink-700">{{ item.sekolah ?? item.instansi ?? '-' }}</td>
                             <td class="px-4 py-4 font-medium text-ink-800">{{ item.bidang }}</td>
-                            <td class="px-4 py-4 text-ink-700">{{ item.posisi }}</td>
                             <td class="px-4 py-4 text-ink-500">{{ formatDate(item.tanggal_mulai) }}</td>
                             <td class="px-4 py-4">
-                                <span :class="getStatusBadgeClass(item.status)" class="badge">
-                                    {{ getStatusLabel(item.status) }}
+                                <span :class="getStatusBadgeClass(item.status_magang)" class="badge">
+                                    {{ getStatusLabel(item.status_magang) }}
                                 </span>
+                            </td>
+                            <td class="px-4 py-4 text-right">
+                                <button
+                                    v-if="item.status_magang === 'aktif'"
+                                    @click="completeParticipant(item.id)"
+                                    :disabled="completing === item.id"
+                                    class="btn-secondary px-3 py-1.5 text-xs disabled:opacity-50"
+                                >
+                                    {{ completing === item.id ? 'Memproses...' : 'Selesaikan' }}
+                                </button>
+                                <span v-else class="text-xs text-ink-400">—</span>
                             </td>
                         </tr>
                         <tr v-if="filteredPeserta.length === 0">

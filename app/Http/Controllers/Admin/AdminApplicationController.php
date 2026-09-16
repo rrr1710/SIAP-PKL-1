@@ -26,7 +26,8 @@ class AdminApplicationController extends Controller
                     'nama' => $item->pemohon?->nama_lengkap ?? '-',
                     'email' => $item->pemohon?->email ?? '-',
                     'bidang' => $item->subInstansi?->nama_sub_instansi ?? '-',
-                    'instansi' => $item->subInstansi?->instansi?->nama_instansi ?? '-',
+                    'asal_instansi_pendidikan' => $item->asal_instansi_pendidikan ?? '-',
+                    'instansi' => $item->asal_instansi_pendidikan ?? $item->subInstansi?->instansi?->nama_instansi ?? '-',
                     'user' => [
                         'name' => $item->pemohon?->nama_lengkap ?? '-',
                         'email' => $item->pemohon?->email ?? '-',
@@ -35,9 +36,6 @@ class AdminApplicationController extends Controller
                         ],
                     ],
                     'division' => [
-                        'nama' => $item->subInstansi?->nama_sub_instansi ?? '-',
-                    ],
-                    'position' => [
                         'nama' => $item->subInstansi?->nama_sub_instansi ?? '-',
                     ],
                 ]);
@@ -70,16 +68,17 @@ class AdminApplicationController extends Controller
             'members' => $members,
             'document_path' => $permohonan->berkas_permohonan,
             'catatan_revisi' => $permohonan->catatan_admin,
+            'asal_instansi_pendidikan' => $permohonan->asal_instansi_pendidikan ?? '-',
             'user' => [
                 'name' => $permohonan->pemohon?->nama_lengkap ?? '-',
                 'email' => $permohonan->pemohon?->email ?? '-',
+                'agency' => [
+                    'name' => $permohonan->asal_instansi_pendidikan ?? $permohonan->subInstansi?->instansi?->nama_instansi ?? '-',
+                ],
             ],
             'division' => [
                 'nama' => $permohonan->subInstansi?->nama_sub_instansi ?? '-',
                 'instansi' => $permohonan->subInstansi?->instansi?->nama_instansi ?? '-',
-            ],
-            'position' => [
-                'nama' => $permohonan->subInstansi?->nama_sub_instansi ?? '-',
             ],
         ]);
 
@@ -141,6 +140,18 @@ class AdminApplicationController extends Controller
         });
 
         return back()->with('success', 'Status pengajuan berhasil diperbarui.');
+    }
+
+    public function completeParticipant(Request $request, PesertaMagang $peserta)
+    {
+        $sub = SubInstansi::where('id_instansi', $request->user()->id_instansi)
+            ->findOrFail($peserta->id_sub_instansi);
+
+        abort_unless($peserta->status_magang === 'aktif', 422, 'Peserta sudah tidak aktif.');
+
+        $peserta->update(['status_magang' => 'selesai']);
+
+        return back()->with('success', 'Status peserta berhasil diubah menjadi Selesai.');
     }
 
     public function document(Request $request, PermohonanPkl $pengajuan)
@@ -274,14 +285,7 @@ class AdminApplicationController extends Controller
         $sub = SubInstansi::where('id_instansi', $request->user()->id_instansi)
             ->findOrFail($data['id_sub_instansi']);
 
-        $occupied = PesertaMagang::where('id_sub_instansi', $sub->id)
-            ->where('status_magang', 'aktif')
-            ->where('tanggal_mulai', '<=', $data['tanggal_selesai'])
-            ->where('tanggal_selesai', '>=', $data['tanggal_mulai'])
-            ->count();
-
-        abort_if($occupied >= $sub->batas_kuota, 422, 'Kuota bidang penuh untuk periode tersebut.');
-
+        // Admin walk-in registration bypasses capacity check intentionally
         PesertaMagang::create([
             'id_sub_instansi' => $sub->id,
             'id_permohonan' => null,

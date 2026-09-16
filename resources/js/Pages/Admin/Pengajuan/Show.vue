@@ -144,8 +144,8 @@ const submitRevision = () => {
                             <p class="mt-1 text-ink-800">{{ pengajuan.user?.email ?? '-' }}</p>
                         </div>
                         <div>
-                            <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Asal Instansi</p>
-                            <p class="mt-1 text-ink-800">{{ pengajuan.user?.agency?.name ?? '-' }}</p>
+                            <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Asal Sekolah/Instansi</p>
+                            <p class="mt-1 text-ink-800">{{ pengajuan.asal_instansi_pendidikan ?? pengajuan.user?.agency?.name ?? '-' }}</p>
                         </div>
                         <div>
                             <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Jurusan</p>
@@ -164,7 +164,7 @@ const submitRevision = () => {
 
                 <!-- Position Applied -->
                 <div class="glass-panel p-6">
-                    <h3 class="mb-4 font-display text-base font-bold text-ink-900">Posisi yang Dilamar</h3>
+                    <h3 class="mb-4 font-display text-base font-bold text-ink-900">Bidang yang Dilamar</h3>
                     <div class="flex items-center gap-4 rounded-xl border border-ink-300/40 bg-white/50 p-4 shadow-sm">
                         <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-forest-600/10 text-forest-700">
                             <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -222,7 +222,7 @@ const submitRevision = () => {
                     </h3>
                     <p class="text-sm text-ink-500">Tinjau pengajuan ini dan tentukan keputusan.</p>
                     <div class="space-y-2">
-                        <template v-if="pengajuan.status === 'pending'">
+                        <template v-if="pengajuan.status === 'menunggu' || pengajuan.status === 'pending'">
                             <div>
                                 <label class="field-label" for="surat_balasan">Surat Balasan</label>
                                 <input id="surat_balasan" type="file" accept=".pdf,.doc,.docx" class="field-input text-xs" :class="{ '!border-red-500 !ring-2 !ring-red-500/25': suratBalasanError }" @change="selectSuratBalasan" :disabled="statusForm.processing" />

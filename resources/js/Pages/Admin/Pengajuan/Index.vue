@@ -11,11 +11,10 @@ const statusFilter = ref('');
 const filteredPengajuan = computed(() => {
     return props.pengajuan.map((item) => ({
         ...item,
-        nama: item.user?.name ?? '-',
-        email: item.user?.email ?? '-',
-        instansi: item.user?.agency?.name ?? item.user?.instansi ?? '-',
-        bidang: item.division?.nama ?? '-',
-        posisi: item.position?.nama ?? '-',
+        nama: item.nama ?? item.user?.name ?? '-',
+        email: item.email ?? item.user?.email ?? '-',
+        asalInstansi: item.asal_instansi_pendidikan ?? item.instansi ?? '-',
+        bidang: item.bidang ?? item.division?.nama ?? '-',
         tanggal: item.created_at,
     })).filter((item) => {
         const matchSearch = !search.value || item.nama.toLowerCase().includes(search.value.toLowerCase());
@@ -47,10 +46,10 @@ const filteredPengajuan = computed(() => {
                 <div class="w-full md:w-52">
                     <select v-model="statusFilter" class="field-input">
                         <option value="">Semua Status</option>
-                        <option value="pending">Menunggu</option>
-                        <option value="accepted">Diterima</option>
-                        <option value="revision">Perlu Revisi</option>
-                        <option value="rejected">Ditolak</option>
+                        <option value="menunggu">Menunggu</option>
+                        <option value="diterima">Diterima</option>
+                        <option value="revisi">Perlu Revisi</option>
+                        <option value="ditolak">Ditolak</option>
                     </select>
                 </div>
             </form>
@@ -59,14 +58,13 @@ const filteredPengajuan = computed(() => {
         <!-- Pengajuan Table -->
         <section class="glass-panel p-6 sm:p-8">
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[800px] text-left text-sm">
+                <table class="w-full min-w-[700px] text-left text-sm">
                     <thead class="border-b border-ink-300/35 text-xs uppercase tracking-wider text-ink-500">
                         <tr>
                             <th class="px-4 py-3 w-12">No</th>
                             <th class="px-4 py-3">Nama</th>
-                            <th class="px-4 py-3">Asal Instansi</th>
+                            <th class="px-4 py-3">Asal Sekolah/Instansi</th>
                             <th class="px-4 py-3">Bidang</th>
-                            <th class="px-4 py-3">Posisi</th>
                             <th class="px-4 py-3">Tanggal</th>
                             <th class="px-4 py-3">Status</th>
                             <th class="px-4 py-3 text-right">Aksi</th>
@@ -79,9 +77,8 @@ const filteredPengajuan = computed(() => {
                                 <div class="font-semibold text-ink-900">{{ item.nama }}</div>
                                 <div class="text-xs text-ink-500">{{ item.email }}</div>
                             </td>
-                            <td class="px-4 py-4 text-ink-700">{{ item.instansi }}</td>
+                            <td class="px-4 py-4 text-ink-700">{{ item.asalInstansi }}</td>
                             <td class="px-4 py-4 font-medium text-ink-800">{{ item.bidang }}</td>
-                            <td class="px-4 py-4 text-ink-700">{{ item.posisi }}</td>
                             <td class="px-4 py-4 text-ink-500">{{ formatDate(item.tanggal) }}</td>
                             <td class="px-4 py-4">
                                 <span :class="getStatusBadgeClass(item.status)" class="badge">
@@ -97,7 +94,7 @@ const filteredPengajuan = computed(() => {
                             </td>
                         </tr>
                         <tr v-if="filteredPengajuan.length === 0">
-                            <td colspan="8" class="px-4 py-10 text-center text-ink-500">
+                            <td colspan="7" class="px-4 py-10 text-center text-ink-500">
                                 Tidak ada pengajuan yang ditemukan.
                             </td>
                         </tr>

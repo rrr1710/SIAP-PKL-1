@@ -16,24 +16,35 @@ class PublicCatalogController extends Controller
 
         $instansiList = $subInstansiList->pluck('nama_instansi')->unique()->sort()->values()->all();
 
-        $filters = $request->only('search', 'instansi', 'status');
+        $filters = $request->only('search', 'instansi', 'status', 'only_available');
 
         $filtered = $this->applyFilters($subInstansiList, $filters);
 
+        $grouped = $filtered->groupBy('nama_instansi')->map(function ($items, $namaInstansi) {
+            return [
+                'nama_instansi'      => $namaInstansi,
+                'total_bidang'       => $items->count(),
+                'total_slot_tersisa' => (int) $items->sum('kuota_sisa'),
+                'total_slot_terisi'  => (int) $items->sum('kuota_terisi'),
+                'divisions'          => $items->values(),
+            ];
+        })->values();
+
         $stats = [
-            'total_bidang' => $subInstansiList->count(),
-            'total_instansi' => count($instansiList),
-            'total_slot_tersisa' => $subInstansiList->sum('kuota_sisa'),
-            'total_slot_terisi' => $subInstansiList->sum('kuota_terisi'),
+            'total_bidang'       => $subInstansiList->count(),
+            'total_instansi'     => count($instansiList),
+            'total_slot_tersisa' => (int) $subInstansiList->sum('kuota_sisa'),
+            'total_slot_terisi'  => (int) $subInstansiList->sum('kuota_terisi'),
         ];
 
         return Inertia::render('Katalog/Index', [
-            'subInstansiList' => $filtered->values(),
-            'divisions' => $filtered->values(),
-            'instansiList' => $instansiList,
-            'instansi' => $instansiList,
-            'stats' => $stats,
-            'filters' => $filters,
+            'activeNav'      => 'katalog',
+            'divisions'      => $filtered->values(),
+            'groupedInstansi'=> $grouped,
+            'instansiList'   => $instansiList,
+            'instansi'       => $instansiList,
+            'stats'          => $stats,
+            'filters'        => $filters,
         ]);
     }
 
@@ -73,13 +84,13 @@ class PublicCatalogController extends Controller
                     'deskripsi' => $subInstansi->deskripsi ?? 'Praktik kerja lapangan pada ' . $subInstansi->nama_sub_instansi,
                     'kuota' => $subInstansi->batas_kuota,
                     'terisi' => $terisi,
-                    'kualifikasi' => ['Mahasiswa / Siswa aktif', 'Memiliki komitmen dan integritas', 'Mampu bekerja secara mandiri dan tim'],
                     'jurusan' => ['Informatika', 'Sistem Informasi', 'Ilmu Komunikasi', 'Administrasi / Terkait'],
                 ],
             ],
         ]);
 
         return Inertia::render('Katalog/Show', [
+            'activeNav' => 'katalog',
             'division' => $data,
             'subInstansi' => $data,
         ]);
@@ -136,15 +147,17 @@ class PublicCatalogController extends Controller
         $search = trim(strtolower((string) ($filters['search'] ?? '')));
         $instansi = trim((string) ($filters['instansi'] ?? ''));
         $status = trim((string) ($filters['status'] ?? ''));
+        $onlyAvailable = filter_var($filters['only_available'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-        return $list->filter(function ($item) use ($search, $instansi, $status) {
+        return $list->filter(function ($item) use ($search, $instansi, $status, $onlyAvailable) {
+            if ($onlyAvailable && ($item->kuota_sisa ?? 0) <= 0) return false;
             if ($instansi !== '' && $item->nama_instansi !== $instansi) return false;
             if ($status !== '') {
                 if ($status === 'penuh' && !in_array($item->status, ['penuh', 'hampir-penuh'], true)) return false;
                 elseif ($status !== 'penuh' && $item->status !== $status) return false;
             }
             if ($search !== '') {
-                $haystack = strtolower($item->nama_sub_instansi . ' ' . $item->nama_instansi . ' ' . $item->deskripsi);
+                $haystack = strtolower($item->nama_sub_instansi . ' ' . $item->nama_instansi . ' ' . ($item->deskripsi ?? ''));
                 if (!str_contains($haystack, $search)) return false;
             }
             return true;

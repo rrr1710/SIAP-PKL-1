@@ -2,7 +2,7 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
-import { getStatusLabel, getStatusBadgeClass, formatDate } from '@/utils/statusLabel';
+import { getStatusLabel, getStatusBadgeClass } from '@/utils/statusLabel';
 
 const props = defineProps({
     stats: { type: Object, default: () => ({}) },
@@ -13,14 +13,16 @@ const props = defineProps({
 const stats = computed(() => props.stats);
 const pengajuanTerbaru = computed(() => props.pengajuanTerbaru.map((item) => ({
     ...item,
-    nama: item.user?.name ?? '-',
-    bidang: item.division?.nama ?? '-',
+    nama: item.nama ?? item.nama_pemohon ?? item.user?.name ?? '-',
+    bidang: item.bidang ?? item.posisi ?? item.division?.nama ?? '-',
+    posisi: item.bidang ?? item.posisi ?? item.division?.nama ?? '-',
     tanggal: item.created_at,
 })));
 const bidangAktif = computed(() => props.bidangAktif.map((item) => ({
     ...item,
-    nama: item.nama,
-    kuota: item.quota,
+    nama: item.nama ?? item.nama_sub_instansi ?? 'Bidang #' + item.id,
+    terisi: Number(item.terisi ?? 0),
+    kuota: Number(item.kuota ?? item.batas_kuota ?? 0),
 })));
 </script>
 
@@ -29,53 +31,29 @@ const bidangAktif = computed(() => props.bidangAktif.map((item) => ({
     <AdminLayout title="Dashboard Admin">
         <div class="mb-6">
             <h2 class="font-display text-xl font-bold text-ink-900">Selamat Datang, Admin Instansi</h2>
-            <p class="mt-1 text-sm text-ink-500">Ringkasan aktivitas PKL Diskominfo Kaltim hari ini.</p>
+            <p class="mt-1 text-sm text-ink-500">Ringkasan aktivitas PKL hari ini.</p>
         </div>
 
         <!-- 4 Stat Cards -->
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div class="glass-card p-5 relative overflow-hidden">
-                <div class="flex items-center justify-between">
-                    <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Total Bidang</p>
-                    <span class="rounded-full bg-forest-500/10 px-2 py-0.5 text-[10px] font-semibold text-forest-600">Aktif</span>
-                </div>
-                <p class="mt-3 font-display text-3xl font-bold text-ink-900">{{ stats.total_bidang }}</p>
-                <svg class="mt-3 h-6 w-full text-forest-500 opacity-80" viewBox="0 0 120 24" fill="none" aria-hidden="true" preserveAspectRatio="none">
-                    <path d="M1 19 L16 15 L29 17 L44 9 L59 13 L74 6 L90 10 L105 3 L119 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+                <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Total Bidang</p>
+                <p class="mt-3 font-display text-3xl font-bold text-ink-900">{{ stats.total_bidang ?? 0 }}</p>
             </div>
 
             <div class="glass-card p-5 relative overflow-hidden">
-                <div class="flex items-center justify-between">
-                    <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Pengajuan Baru</p>
-                    <span class="rounded-full bg-forest-500/10 px-2 py-0.5 text-[10px] font-semibold text-forest-600">+3</span>
-                </div>
-                <p class="mt-3 font-display text-3xl font-bold text-ink-900">{{ stats.pengajuan_baru }}</p>
-                <svg class="mt-3 h-6 w-full text-forest-500 opacity-80" viewBox="0 0 120 24" fill="none" aria-hidden="true" preserveAspectRatio="none">
-                    <path d="M1 17 L16 18 L29 12 L44 14 L59 8 L74 11 L90 5 L105 8 L119 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+                <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Pengajuan Baru</p>
+                <p class="mt-3 font-display text-3xl font-bold text-ink-900">{{ stats.pengajuan_baru ?? 0 }}</p>
             </div>
 
             <div class="glass-card p-5 relative overflow-hidden">
-                <div class="flex items-center justify-between">
-                    <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Menunggu Verifikasi</p>
-                    <span class="rounded-full bg-gold-500/15 px-2 py-0.5 text-[10px] font-semibold text-gold-500">Perlu Ditinjau</span>
-                </div>
-                <p class="mt-3 font-display text-3xl font-bold text-gold-500">{{ stats.menunggu_verifikasi }}</p>
-                <svg class="mt-3 h-6 w-full text-gold-500 opacity-80" viewBox="0 0 120 24" fill="none" aria-hidden="true" preserveAspectRatio="none">
-                    <path d="M1 12 L16 14 L29 9 L44 15 L59 10 L74 16 L90 11 L105 13 L119 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+                <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Menunggu Verifikasi</p>
+                <p class="mt-3 font-display text-3xl font-bold text-gold-500">{{ stats.menunggu_verifikasi ?? 0 }}</p>
             </div>
 
             <div class="glass-card p-5 relative overflow-hidden">
-                <div class="flex items-center justify-between">
-                    <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Peserta Aktif</p>
-                    <span class="rounded-full bg-status-success/10 px-2 py-0.5 text-[10px] font-semibold text-status-success">On Progress</span>
-                </div>
-                <p class="mt-3 font-display text-3xl font-bold text-status-success">{{ stats.peserta_aktif }}</p>
-                <svg class="mt-3 h-6 w-full text-status-success opacity-80" viewBox="0 0 120 24" fill="none" aria-hidden="true" preserveAspectRatio="none">
-                    <path d="M1 20 L16 16 L29 18 L44 12 L59 14 L74 8 L90 11 L105 4 L119 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+                <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Peserta Aktif</p>
+                <p class="mt-3 font-display text-3xl font-bold text-status-success">{{ stats.peserta_aktif ?? 0 }}</p>
             </div>
         </div>
 
@@ -93,18 +71,23 @@ const bidangAktif = computed(() => props.bidangAktif.map((item) => ({
                         <thead class="border-b border-ink-300/35 text-xs uppercase tracking-wider text-ink-500">
                             <tr>
                                 <th class="px-3 py-2">Nama</th>
-                                <th class="px-3 py-2">Posisi</th>
+                                <th class="px-3 py-2">Bidang</th>
                                 <th class="px-3 py-2">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-ink-300/20">
                             <tr v-for="item in pengajuanTerbaru" :key="item.id" class="transition hover:bg-forest-50/60">
                                 <td class="px-3 py-3 font-medium text-ink-900">{{ item.nama }}</td>
-                                <td class="px-3 py-3 text-ink-700">{{ item.posisi }}</td>
+                                <td class="px-3 py-3 text-ink-700">{{ item.bidang }}</td>
                                 <td class="px-3 py-3">
                                     <span :class="getStatusBadgeClass(item.status)" class="badge">
                                         {{ getStatusLabel(item.status) }}
                                     </span>
+                                </td>
+                            </tr>
+                            <tr v-if="pengajuanTerbaru.length === 0">
+                                <td colspan="3" class="px-3 py-8 text-center text-xs text-ink-400">
+                                    Belum ada pengajuan terbaru.
                                 </td>
                             </tr>
                         </tbody>
@@ -122,15 +105,26 @@ const bidangAktif = computed(() => props.bidangAktif.map((item) => ({
                 <ul class="space-y-4">
                     <li v-for="item in bidangAktif" :key="item.id" class="rounded-xl border border-ink-300/40 bg-white/50 p-4 shadow-sm">
                         <div class="flex items-center justify-between">
-                            <p class="text-sm font-semibold text-ink-900">{{ item.nama || item.nama_sub_instansi || ('Bidang #' + item.id) }}</p>
-                            <span class="text-xs font-medium text-ink-500">{{ item.terisi ?? 0 }}/{{ item.kuota || item.batas_kuota || 0 }}</span>
+                            <p class="text-sm font-semibold text-ink-900">{{ item.nama }}</p>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-medium text-ink-600">
+                                    {{ item.terisi }} / {{ item.kuota }} terisi
+                                </span>
+                                <span v-if="item.kuota > 0 && item.terisi > item.kuota" class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                                    +{{ item.terisi - item.kuota }} manual
+                                </span>
+                            </div>
                         </div>
                         <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink-100">
                             <div
-                                class="h-full rounded-full bg-forest-500 transition-all"
-                                :style="{ width: `${Math.min(100, Math.round(((item.terisi ?? 0) / Math.max(1, item.kuota || item.batas_kuota || 1)) * 100))}%` }"
+                                class="h-full rounded-full transition-all"
+                                :class="item.kuota > 0 && item.terisi > item.kuota ? 'bg-amber-500' : 'bg-forest-500'"
+                                :style="{ width: `${item.kuota > 0 ? Math.min(100, Math.round((item.terisi / item.kuota) * 100)) : (item.terisi > 0 ? 100 : 0)}%` }"
                             />
                         </div>
+                    </li>
+                    <li v-if="bidangAktif.length === 0" class="py-6 text-center text-xs text-ink-400">
+                        Belum ada bidang aktif.
                     </li>
                 </ul>
             </div>

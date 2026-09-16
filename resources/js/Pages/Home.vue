@@ -1,136 +1,152 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
-import { getStatusLabel, getStatusBadgeClass } from '@/utils/statusLabel';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { getStatusLabel, getStatusBadgeClass, getTimelineSteps } from '@/utils/statusLabel';
+import {
+    FileText,
+    CheckCircle,
+    Clock,
+    Search,
+    ArrowRight,
+    MapPin,
+} from 'lucide-vue-next';
 
-defineProps({
-    stats: {
-        type: Object,
-        default: () => ({ lowongan_tersedia: 0, pendaftaran: 0, menunggu_verifikasi: 0, diterima: 0 }),
-    },
+const page = usePage();
+const user = computed(() => page.props.auth?.user);
+
+const props = defineProps({
     pendaftaranAktif: { type: Object, default: null },
-    pengumuman: { type: Array, default: () => [] },
+});
+
+const steps = computed(() => getTimelineSteps(props.pendaftaranAktif));
+
+const firstName = computed(() => {
+    const name = user.value?.name ?? user.value?.nama_lengkap ?? '';
+    return name.split(' ')[0] || 'Mahasiswa';
 });
 </script>
 
 <template>
     <Head title="Home" />
-    <AppLayout title="Home">
-        <template #default>
-            <div class="mb-6">
-                <h2 class="font-display text-xl font-bold text-ink-900">Halo, Mahasiswa dan Siswa/Siswi  yang sedang PKL</h2>
-                <p class="mt-1 text-sm text-ink-500">Selamat datang di Sistem Management PKL Diskominfo Kaltim.</p>
+    <AppLayout title="Beranda">
+        <!-- Greeting -->
+        <div class="mb-6">
+            <h2 class="font-display text-xl font-bold text-ink-900">
+                Halo, {{ firstName }}
+            </h2>
+            <p class="mt-1 text-sm text-ink-500">
+                Selamat datang di Portal PKL — Dinas Komunikasi dan Informatika Provinsi Kalimantan Timur.
+            </p>
+        </div>
+
+        <!-- State-driven Task Center -->
+        <!-- State: No active application -->
+        <div v-if="!pendaftaranAktif" class="glass-panel p-8 rounded-3xl">
+            <div class="flex flex-col items-center text-center gap-5">
+                <div class="grid h-16 w-16 place-items-center rounded-2xl bg-ink-100 text-ink-400">
+                    <FileText :size="30" :stroke-width="1.6" />
+                </div>
+                <div>
+                    <h3 class="font-display text-xl font-bold text-ink-900">Belum Ada Pengajuan Aktif</h3>
+                    <p class="mt-2 max-w-md text-sm leading-relaxed text-ink-500">
+                        Kamu belum memiliki pengajuan PKL yang sedang berjalan. Mulai dengan menjelajahi katalog bidang yang tersedia.
+                    </p>
+                </div>
+                <Link :href="route('katalog.index')" class="btn-primary flex items-center gap-2 px-6">
+                    <Search :size="16" :stroke-width="2" />
+                    Jelajahi Katalog Bidang
+                    <ArrowRight :size="16" :stroke-width="2" />
+                </Link>
+            </div>
+        </div>
+
+        <!-- State: Active application (menunggu / diterima) -->
+        <div v-else class="space-y-6">
+            <!-- Application Summary Card -->
+            <div class="glass-panel p-6 rounded-3xl">
+                <div class="mb-5 flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-ink-400">Pengajuan Aktif</p>
+                        <h3 class="mt-1 font-display text-xl font-bold text-ink-900">
+                            {{ pendaftaranAktif.judul }}
+                        </h3>
+                        <div class="mt-1.5 flex items-center gap-1.5 text-sm text-ink-500">
+                            <MapPin :size="13" :stroke-width="2" />
+                            {{ pendaftaranAktif.instansi }}
+                        </div>
+                    </div>
+                    <span :class="getStatusBadgeClass(pendaftaranAktif.status)" class="badge shrink-0">
+                        {{ getStatusLabel(pendaftaranAktif.status) }}
+                    </span>
+                </div>
+
+                <!-- Progress Stepper -->
+                <div class="relative flex items-start justify-between px-2">
+                    <template v-for="(step, idx) in steps" :key="idx">
+                        <!-- Connector line -->
+                        <div
+                            v-if="idx > 0"
+                            class="absolute top-4 h-0.5 flex-1 transition-colors duration-500"
+                            :class="step.done ? 'bg-forest-500' : 'bg-ink-200'"
+                            :style="`left: calc(${(idx / (steps.length - 1)) * 100}% * ${idx} / ${steps.length - 1} + ${idx * (100 / (steps.length - 1))}%); width: calc(100% / ${steps.length - 1} - 2rem)`"
+                        />
+                        <div class="relative z-10 flex flex-col items-center gap-2 text-center" style="min-width:4rem;">
+                            <div
+                                class="grid h-8 w-8 place-items-center rounded-full border-2 transition-colors duration-300"
+                                :class="step.active
+                                    ? 'border-forest-600 bg-forest-600 text-white'
+                                    : step.done
+                                        ? 'border-forest-500 bg-forest-50 text-forest-600'
+                                        : 'border-ink-300 bg-white text-ink-400'"
+                            >
+                                <CheckCircle v-if="step.done && !step.active" :size="14" :stroke-width="2.5" />
+                                <Clock v-else-if="step.active" :size="14" :stroke-width="2.5" />
+                                <span v-else class="text-[10px] font-bold">{{ idx + 1 }}</span>
+                            </div>
+                            <p class="text-[11px] font-medium leading-tight" :class="step.active ? 'text-forest-700' : step.done ? 'text-ink-600' : 'text-ink-400'">
+                                {{ step.label }}
+                            </p>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- CTA -->
+                <div class="mt-6 flex justify-end">
+                    <Link :href="route('status.index')" class="btn-primary flex items-center gap-2 text-sm">
+                        Lihat Detail Status
+                        <ArrowRight :size="15" :stroke-width="2" />
+                    </Link>
+                </div>
             </div>
 
-            <!-- 4 Stat Cards in a row -->
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <!-- Bidang Tersedia -->
-                <div class="glass-card p-5 relative overflow-hidden">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Bidang Tersedia</p>
-                        <span class="rounded-full bg-forest-500/10 px-2 py-0.5 text-[10px] font-semibold text-forest-600">+12%</span>
+            <!-- Quick Links -->
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Link
+                    :href="route('katalog.index')"
+                    class="glass-panel flex items-center gap-4 rounded-2xl p-5 transition hover:bg-white/80"
+                >
+                    <div class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-forest-600/10 text-forest-700">
+                        <Search :size="20" :stroke-width="1.8" />
                     </div>
-                    <p class="mt-3 font-display text-3xl font-bold text-ink-900">{{ stats.lowongan_tersedia }}</p>
-                    <svg class="mt-3 h-6 w-full text-forest-500 opacity-80" viewBox="0 0 120 24" fill="none" aria-hidden="true" preserveAspectRatio="none">
-                        <path d="M1 19 L16 15 L29 17 L44 9 L59 13 L74 6 L90 10 L105 3 L119 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </div>
-
-                <!-- Pendaftaran -->
-                <div class="glass-card p-5 relative overflow-hidden">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Pendaftaran</p>
-                        <span class="rounded-full bg-forest-500/10 px-2 py-0.5 text-[10px] font-semibold text-forest-600">+5%</span>
+                    <div>
+                        <p class="font-semibold text-ink-900">Katalog Bidang</p>
+                        <p class="text-xs text-ink-500 mt-0.5">Jelajahi semua bidang PKL tersedia</p>
                     </div>
-                    <p class="mt-3 font-display text-3xl font-bold text-ink-900">{{ stats.pendaftaran }}</p>
-                    <svg class="mt-3 h-6 w-full text-forest-500 opacity-80" viewBox="0 0 120 24" fill="none" aria-hidden="true" preserveAspectRatio="none">
-                        <path d="M1 17 L16 18 L29 12 L44 14 L59 8 L74 11 L90 5 L105 8 L119 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </div>
-
-                <!-- Menunggu Verifikasi -->
-                <div class="glass-card p-5 relative overflow-hidden">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Menunggu Verifikasi</p>
-                        <span class="rounded-full bg-ink-500/10 px-2 py-0.5 text-[10px] font-semibold text-ink-500">0%</span>
+                </Link>
+                <Link
+                    :href="route('riwayat.index')"
+                    class="glass-panel flex items-center gap-4 rounded-2xl p-5 transition hover:bg-white/80"
+                >
+                    <div class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-forest-600/10 text-forest-700">
+                        <Clock :size="20" :stroke-width="1.8" />
                     </div>
-                    <p class="mt-3 font-display text-3xl font-bold text-gold-500">{{ stats.menunggu_verifikasi }}</p>
-                    <svg class="mt-3 h-6 w-full text-gold-500 opacity-80" viewBox="0 0 120 24" fill="none" aria-hidden="true" preserveAspectRatio="none">
-                        <path d="M1 12 L16 14 L29 9 L44 15 L59 10 L74 16 L90 11 L105 13 L119 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </div>
-
-                <!-- Diterima -->
-                <div class="glass-card p-5 relative overflow-hidden">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs font-medium text-ink-500 uppercase tracking-wider">Diterima</p>
-                        <span class="rounded-full bg-forest-500/10 px-2 py-0.5 text-[10px] font-semibold text-forest-600">0%</span>
+                    <div>
+                        <p class="font-semibold text-ink-900">Riwayat Pengajuan</p>
+                        <p class="text-xs text-ink-500 mt-0.5">Lihat pengajuan sebelumnya</p>
                     </div>
-                    <p class="mt-3 font-display text-3xl font-bold text-status-success">{{ stats.diterima }}</p>
-                    <svg class="mt-3 h-6 w-full text-status-success opacity-80" viewBox="0 0 120 24" fill="none" aria-hidden="true" preserveAspectRatio="none">
-                        <path d="M1 20 L16 16 L29 18 L44 12 L59 14 L74 8 L90 11 L105 4 L119 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </div>
+                </Link>
             </div>
-
-            <!-- 2 Columns Below -->
-            <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <!-- Left: Pendaftaran Aktif -->
-                <div class="glass-panel p-6">
-                    <div class="mb-4 flex items-center justify-between">
-                        <h3 class="font-display text-base font-bold text-ink-900">Pendaftaran Aktif</h3>
-                        <Link :href="route('riwayat.index')" class="text-xs font-semibold text-forest-700 hover:underline">Lihat semua</Link>
-                    </div>
-
-                    <div v-if="pendaftaranAktif">
-                        <Link :href="route('status.index')" class="flex items-center gap-4 rounded-xl border border-ink-300/40 bg-white/50 p-4 shadow-sm transition hover:bg-white/80">
-                            <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-forest-600/10 text-forest-700">
-                                <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-                                    <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
-                                </svg>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="truncate text-sm font-semibold text-ink-900">{{ pendaftaranAktif.judul }}</p>
-                                <p class="text-xs text-ink-500 mt-0.5">{{ pendaftaranAktif.instansi }} · {{ pendaftaranAktif.tanggal }}</p>
-                            </div>
-                            <span :class="getStatusBadgeClass(pendaftaranAktif.status)" class="badge">
-                                {{ getStatusLabel(pendaftaranAktif.status) }}
-                            </span>
-                        </Link>
-                    </div>
-                    <div v-else class="rounded-xl border border-dashed border-ink-300/60 p-8 text-center">
-                        <p class="text-sm text-ink-500">Belum ada pendaftaran aktif saat ini.</p>
-                        <Link :href="route('katalog.index')" class="btn-primary mt-4 text-xs">Cari Bidang PKL</Link>
-                    </div>
-                </div>
-
-                <!-- Right: Pengumuman Terbaru -->
-                <div class="glass-panel p-6">
-                    <div class="mb-4 flex items-center justify-between">
-                        <h3 class="font-display text-base font-bold text-ink-900">Pengumuman Terbaru</h3>
-                        <Link href="#" class="text-xs font-semibold text-forest-700 hover:underline">Lihat semua</Link>
-                    </div>
-
-                    <ul class="space-y-4">
-                        <li class="flex items-start gap-3 rounded-lg p-2 transition hover:bg-white/40">
-                            <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-forest-600" />
-                            <div>
-                                <p class="text-sm font-medium text-ink-900">Pembukaan Pendaftaran PKL Periode Gelombang II Diskominfo Kaltim</p>
-                                <p class="text-xs text-ink-500 mt-0.5">01 September 2026</p>
-                            </div>
-                        </li>
-                        <li class="flex items-start gap-3 rounded-lg p-2 transition hover:bg-white/40">
-                            <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-forest-600" />
-                            <div>
-                                <p class="text-sm font-medium text-ink-900">Jadwal Orientasi dan Pembekalan Mahasiswa PKL Baru</p>
-                                <p class="text-xs text-ink-500 mt-0.5">28 Agustus 2026</p>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </template>
+        </div>
     </AppLayout>
 </template>
-

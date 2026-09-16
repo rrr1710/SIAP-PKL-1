@@ -82,39 +82,56 @@ class PengajuanPklController extends Controller
         if (!isset($input['id_sub_instansi']) && isset($input['division_id'])) {
             $input['id_sub_instansi'] = $input['division_id'];
         }
+        if (!isset($input['division_id']) && isset($input['id_sub_instansi'])) {
+            $input['division_id'] = $input['id_sub_instansi'];
+        }
         if (!isset($input['tanggal_mulai']) && isset($input['start_date'])) {
             $input['tanggal_mulai'] = $input['start_date'];
         }
         if (!isset($input['tanggal_selesai']) && isset($input['end_date'])) {
             $input['tanggal_selesai'] = $input['end_date'];
         }
-        if (!$request->hasFile('berkas_permohonan') && $request->hasFile('document')) {
-            $request->files->set('berkas_permohonan', $request->file('document'));
-        }
         if (isset($input['ketua'])) {
             if (!isset($input['ketua']['nama_mahasiswa']) && isset($input['ketua']['name'])) {
                 $input['ketua']['nama_mahasiswa'] = $input['ketua']['name'];
             }
+            if (!isset($input['ketua']['name']) && isset($input['ketua']['nama_mahasiswa'])) {
+                $input['ketua']['name'] = $input['ketua']['nama_mahasiswa'];
+            }
             if (!isset($input['ketua']['sekolah']) && isset($input['ketua']['school'])) {
                 $input['ketua']['sekolah'] = $input['ketua']['school'];
+            }
+            if (!isset($input['ketua']['school']) && isset($input['ketua']['sekolah'])) {
+                $input['ketua']['school'] = $input['ketua']['sekolah'];
             }
             if (!isset($input['ketua']['no_hp']) && isset($input['ketua']['phone'])) {
                 $input['ketua']['no_hp'] = $input['ketua']['phone'];
             }
+            if (!isset($input['ketua']['phone']) && isset($input['ketua']['no_hp'])) {
+                $input['ketua']['phone'] = $input['ketua']['no_hp'];
+            }
         }
-        if (!isset($input['anggota']) && isset($input['members'])) {
-            $input['anggota'] = array_map(function ($m) {
-                return [
-                    'nama_mahasiswa' => $m['nama_mahasiswa'] ?? $m['name'] ?? '',
-                    'nim' => $m['nim'] ?? null,
-                    'sekolah' => $m['sekolah'] ?? $m['school'] ?? '',
-                    'no_hp' => $m['no_hp'] ?? $m['phone'] ?? '',
-                ];
-            }, (array) $input['members']);
+        if (($input['tipe'] ?? 'individu') === 'kelompok') {
+            if (!isset($input['anggota']) && isset($input['members'])) {
+                $input['anggota'] = array_map(function ($m) {
+                    return [
+                        'nama_mahasiswa' => $m['nama_mahasiswa'] ?? $m['name'] ?? '',
+                        'name' => $m['name'] ?? $m['nama_mahasiswa'] ?? '',
+                        'nim' => $m['nim'] ?? null,
+                        'sekolah' => $m['sekolah'] ?? $m['school'] ?? '',
+                        'school' => $m['school'] ?? $m['sekolah'] ?? '',
+                        'no_hp' => $m['no_hp'] ?? $m['phone'] ?? '',
+                        'phone' => $m['phone'] ?? $m['no_hp'] ?? '',
+                    ];
+                }, (array) $input['members']);
+            }
+        } else {
+            // Unset anggota and members when individu so required_if and min:1 don't trigger on empty array
+            unset($input['anggota'], $input['members']);
         }
         $request->merge($input);
 
-        $data = $request->validate([
+        $rules = [
             'id_sub_instansi' => ['required', 'integer', 'exists:sub_instansi,id'],
             'tanggal_mulai' => ['required', 'date'],
             'tanggal_selesai' => ['required', 'date', 'after_or_equal:tanggal_mulai'],
@@ -124,12 +141,19 @@ class PengajuanPklController extends Controller
             'ketua.sekolah' => ['required', 'string', 'max:255'],
             'ketua.no_hp' => ['required', 'string', 'max:20'],
             'anggota' => ['required_if:tipe,kelompok', 'array', 'min:1'],
-            'anggota.*.nama_mahasiswa' => ['required', 'string', 'max:255'],
+            'anggota.*.nama_mahasiswa' => ['required_if:tipe,kelompok', 'string', 'max:255'],
             'anggota.*.nim' => ['nullable', 'string', 'max:50'],
-            'anggota.*.sekolah' => ['required', 'string', 'max:255'],
-            'anggota.*.no_hp' => ['required', 'string', 'max:20'],
-            'berkas_permohonan' => ['required', 'file', 'mimes:pdf', 'max:5120'],
-        ]);
+            'anggota.*.sekolah' => ['required_if:tipe,kelompok', 'string', 'max:255'],
+            'anggota.*.no_hp' => ['required_if:tipe,kelompok', 'string', 'max:20'],
+        ];
+
+        if ($request->hasFile('berkas_permohonan')) {
+            $rules['berkas_permohonan'] = ['required', 'file', 'mimes:pdf', 'max:5120'];
+        } else {
+            $rules['document'] = ['required', 'file', 'mimes:pdf', 'max:5120'];
+        }
+
+        $data = $request->validate($rules);
 
         $idSubInstansi = $data['id_sub_instansi'];
         $tanggalMulai = $data['tanggal_mulai'];
@@ -169,7 +193,13 @@ class PengajuanPklController extends Controller
                 ]);
             }
 
-            $file = $request->file('berkas_permohonan');
+            $file = $request->file('berkas_permohonan') ?? $request->file('document');
+            if (!$file) {
+                throw ValidationException::withMessages([
+                    'document' => 'File berkas permohonan tidak ditemukan.',
+                    'berkas_permohonan' => 'File berkas permohonan tidak ditemukan.',
+                ]);
+            }
             $nama = sprintf(
                 'berkas_pkl_user%d_%s_%s.pdf',
                 $request->user()->id,

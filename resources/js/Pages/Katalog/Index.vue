@@ -1,7 +1,8 @@
 <script setup>
+import AppLayout from '@/Layouts/AppLayout.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import BidangCard from '@/Components/BidangCard.vue';
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import {
     Search,
@@ -15,18 +16,43 @@ import {
 } from 'lucide-vue-next';
 
 const props = defineProps({
-    divisions: { type: Array, default: () => [] },
-    instansi: { type: Array, default: () => [] },
-    stats: { type: Object, default: () => ({}) },
-    filters: { type: Object, default: () => ({ search: '', instansi: '', status: '' }) },
+    divisions:       { type: Array,  default: () => [] },
+    groupedInstansi: { type: Array,  default: () => [] },
+    instansi:        { type: Array,  default: () => [] },
+    stats:           { type: Object, default: () => ({}) },
+    filters:         { type: Object, default: () => ({ search: '', instansi: '', status: '', only_available: false }) },
 });
 
-const search = ref(props.filters.search || '');
-const instansi = ref(props.filters.instansi || '');
-const status = ref(props.filters.status || '');
+const search        = ref(props.filters.search || '');
+const selectedInst  = ref(props.filters.instansi || '');
+const status        = ref(props.filters.status || '');
+const onlyAvailable = ref(Boolean(props.filters.only_available));
+
+// Grouped list: prefer server-side groupedInstansi, fall back to client-side derivation
+const groupedList = computed(() => {
+    if (props.groupedInstansi && props.groupedInstansi.length > 0) {
+        return props.groupedInstansi;
+    }
+    const map = {};
+    for (const item of props.divisions) {
+        const key = item.nama_instansi || item.instansi || '—';
+        if (!map[key]) {
+            map[key] = { nama_instansi: key, total_bidang: 0, total_slot_tersisa: 0, total_slot_terisi: 0, divisions: [] };
+        }
+        map[key].divisions.push(item);
+        map[key].total_bidang       += 1;
+        map[key].total_slot_tersisa += Math.max(0, Number(item.kuota_sisa ?? 0));
+        map[key].total_slot_terisi  += Number(item.kuota_terisi ?? 0);
+    }
+    return Object.values(map);
+});
+
+const totalDivisions = computed(() => props.divisions.length);
 
 const page = usePage();
 const isAuthenticated = computed(() => !!page.props.auth?.user);
+const layout = computed(() => (isAuthenticated.value ? AppLayout : PublicLayout));
+const layoutProps = computed(() => (isAuthenticated.value ? { title: 'Katalog Bidang PKL' } : {}));
 
 const getPrimaryCta = (item) => {
     if (isAuthenticated.value) {
@@ -44,7 +70,7 @@ const getPrimaryCta = (item) => {
 };
 
 const hasActiveFilter = computed(
-    () => search.value !== '' || instansi.value !== '' || status.value !== ''
+    () => search.value !== '' || selectedInst.value !== '' || status.value !== '' || onlyAvailable.value
 );
 
 const statusOptions = [
@@ -63,23 +89,25 @@ const statCards = computed(() => [
 
 const handleFilter = () => {
     router.get(route('katalog.index'), {
-        search: search.value,
-        instansi: instansi.value,
-        status: status.value,
+        search:         search.value || undefined,
+        instansi:       selectedInst.value || undefined,
+        status:         status.value || undefined,
+        only_available: onlyAvailable.value ? '1' : undefined,
     }, { preserveState: true, preserveScroll: true });
 };
 
 const resetFilters = () => {
-    search.value = '';
-    instansi.value = '';
-    status.value = '';
+    search.value       = '';
+    selectedInst.value = '';
+    status.value       = '';
+    onlyAvailable.value = false;
     router.get(route('katalog.index'), {}, { preserveState: true, preserveScroll: true });
 };
 </script>
 
 <template>
     <Head title="Katalog Bidang PKL" />
-    <PublicLayout>
+    <component :is="layout" v-bind="layoutProps">
         <!-- Hero -->
         <section class="bg-gradient-to-br from-forest-950 via-forest-900 to-forest-800 text-white">
             <div class="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
@@ -90,7 +118,12 @@ const resetFilters = () => {
                     Katalog Bidang Praktik Kerja Lapangan
                 </h1>
                 <p class="mt-3 max-w-2xl text-sm leading-relaxed text-white/80 sm:text-base">
-                    Jelajahi daftar bidang PKL beserta kuota, jurusan yang dicari, dan ketersediaannya. Untuk mendaftar, silakan masuk terlebih dahulu menggunakan akun Google Anda.
+                    <template v-if="isAuthenticated">
+                        Jelajahi daftar bidang PKL beserta kuota dan ketersediaannya untuk mengajukan permohonan PKL Anda.
+                    </template>
+                    <template v-else>
+                        Jelajahi daftar bidang PKL beserta kuota, jurusan yang dicari, dan ketersediaannya. Untuk mendaftar, silakan masuk terlebih dahulu menggunakan akun Google Anda.
+                    </template>
                 </p>
             </div>
         </section>
@@ -134,7 +167,7 @@ const resetFilters = () => {
 
                     <label class="relative block">
                         <span class="sr-only">Filter Instansi</span>
-                        <select v-model="instansi" class="field-input appearance-none pr-8">
+                        <select v-model="selectedInst" class="field-input appearance-none pr-8">
                             <option value="">Semua Instansi</option>
                             <option v-for="nama in instansi" :key="nama" :value="nama">{{ nama }}</option>
                         </select>
@@ -167,20 +200,76 @@ const resetFilters = () => {
                         </button>
                     </div>
                 </div>
+
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-ink-300/20 pt-3 text-xs">
+                    <label class="flex items-center gap-2 cursor-pointer select-none font-medium text-ink-700">
+                        <input
+                            type="checkbox"
+                            v-model="onlyAvailable"
+                            @change="handleFilter"
+                            class="rounded border-ink-300 text-forest-600 focus:ring-forest-500 h-4 w-4"
+                        />
+                        <span>Hanya Slot Tersedia</span>
+                    </label>
+                    <span class="text-ink-400">Menampilkan {{ totalDivisions }} bidang dari {{ groupedList.length }} instansi</span>
+                </div>
             </form>
         </section>
 
-        <!-- Grid Bidang -->
+        <!-- Grouped Instansi > SubInstansi Grid -->
         <section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-            <div v-if="divisions.length > 0" class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                <BidangCard
-                    v-for="item in divisions"
-                    :key="item.id"
-                    :item="item"
-                    :detail-href="route('katalog.show', item.slug)"
-                    :primary="getPrimaryCta(item)"
-                />
-            </div>
+            <template v-if="groupedList.length > 0">
+                <div
+                    v-for="group in groupedList"
+                    :key="group.nama_instansi"
+                    class="mb-14"
+                >
+                    <!-- Parent Instansi Header -->
+                    <div class="mb-6 flex flex-wrap items-center justify-between gap-4 border-b-2 border-forest-200/60 pb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-forest-700/10 text-forest-800">
+                                <Building2 :size="24" :stroke-width="1.8" />
+                            </div>
+                            <div>
+                                <h2 class="font-display text-xl font-extrabold text-ink-900 sm:text-2xl">
+                                    {{ group.nama_instansi }}
+                                </h2>
+                                <p class="mt-0.5 text-xs font-medium text-ink-500">Instansi Penyelenggara PKL</p>
+                            </div>
+                        </div>
+
+                        <!-- Instansi Summary Badges -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="rounded-xl border border-forest-200/60 bg-forest-50 px-3 py-1.5 text-xs font-semibold text-forest-700">
+                                {{ group.total_bidang }} Bidang
+                            </span>
+                            <span
+                                v-if="group.total_slot_tersisa > 0"
+                                class="rounded-xl border border-emerald-200/60 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700"
+                            >
+                                {{ group.total_slot_tersisa }} Slot Tersisa
+                            </span>
+                            <span
+                                v-else
+                                class="rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700"
+                            >
+                                ✦ Kuota Penuh
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- SubInstansi Cards Grid -->
+                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                        <BidangCard
+                            v-for="item in group.divisions"
+                            :key="item.id"
+                            :item="item"
+                            :detail-href="route('katalog.show', item.slug ?? item.id)"
+                            :primary="getPrimaryCta(item)"
+                        />
+                    </div>
+                </div>
+            </template>
 
             <!-- Empty State -->
             <div v-else class="glass-panel rounded-3xl p-14 text-center">
@@ -191,7 +280,7 @@ const resetFilters = () => {
                     Tidak ada bidang yang sesuai dengan pencarian Anda
                 </h2>
                 <p class="mx-auto mt-2 max-w-md text-sm text-ink-500">
-                    Coba ubah kata kunci, ganti instansi, atau pilih status kuota lainnya untuk menemukan bidang PKL yang tepat bagi Anda.
+                    Coba ubah kata kunci, ganti instansi, atau pilih status kuota lainnya.
                 </p>
                 <button @click="resetFilters" class="btn-secondary mt-6">
                     <RotateCcw :size="16" :stroke-width="2" />
@@ -199,5 +288,5 @@ const resetFilters = () => {
                 </button>
             </div>
         </section>
-    </PublicLayout>
+    </component>
 </template>

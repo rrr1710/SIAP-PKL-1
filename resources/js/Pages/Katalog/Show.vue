@@ -1,44 +1,45 @@
 <script setup>
+import AppLayout from '@/Layouts/AppLayout.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const page = usePage();
 const user = computed(() => page.props.auth?.user);
+const layout = computed(() => (user.value ? AppLayout : PublicLayout));
+const layoutProps = computed(() => (user.value ? { title: props.division.nama } : {}));
 
 const props = defineProps({
     division: { type: Object, required: true },
 });
 
-const statusMeta = (division) => {
-    const sisa = Number(division.sisa_total ?? 0);
-    const quota = Number(division.kuota_total ?? 0);
+const isFull = computed(() => {
+    const sisa = Number(props.division.sisa_total ?? props.division.kuota_sisa ?? 0);
+    const terisi = Number(props.division.terisi_total ?? props.division.kuota_terisi ?? 0);
+    const kuota = Number(props.division.kuota_total ?? props.division.batas_kuota ?? 0);
+    return sisa <= 0 || (kuota > 0 && terisi >= kuota);
+});
 
-    if (sisa <= 0 || quota <= 0) {
+const statusMeta = (division) => {
+    const sisa = Number(division.sisa_total ?? division.kuota_sisa ?? 0);
+    const terisi = Number(division.terisi_total ?? division.kuota_terisi ?? 0);
+    const quota = Number(division.kuota_total ?? division.batas_kuota ?? 0);
+
+    if (sisa <= 0 || (quota > 0 && terisi >= quota)) {
         return {
             label: 'Kuota Penuh',
-            badge: 'bg-ink-300/25 text-ink-500',
+            badge: 'bg-amber-100 text-amber-700 font-semibold',
             bar: 'bg-ink-400',
         };
     }
 
-    const sisaPct = (sisa / quota) * 100;
-
-    if (sisaPct > 50) {
-        return { label: 'Buka / Tersedia', badge: 'badge-success', bar: 'bg-status-success' };
-    }
-
-    if (sisaPct >= 20) {
-        return { label: 'Kuota Menipis', badge: 'badge-warning', bar: 'bg-gold-500' };
-    }
-
-    return { label: 'Hampir Penuh', badge: 'badge-danger', bar: 'bg-status-danger' };
+    return { label: 'Buka / Tersedia', badge: 'badge-success', bar: 'bg-status-success' };
 };
 </script>
 
 <template>
     <Head :title="props.division.nama" />
-    <PublicLayout>
+    <component :is="layout" v-bind="layoutProps">
         <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
             <!-- Breadcrumb -->
             <nav class="mb-6 flex items-center gap-2 text-sm text-ink-500">
@@ -92,21 +93,6 @@ const statusMeta = (division) => {
 
                                 <p class="mt-4 text-sm leading-relaxed text-ink-700">{{ posisi.deskripsi }}</p>
 
-                                <!-- Kualifikasi -->
-                                <div v-if="posisi.kualifikasi?.length" class="mt-5">
-                                    <h4 class="text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Kualifikasi</h4>
-                                    <ul class="space-y-2 text-sm text-ink-700">
-                                        <li v-for="(kual, kidx) in posisi.kualifikasi" :key="kidx" class="flex items-center gap-2.5">
-                                            <span class="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-forest-600/10 text-forest-600">
-                                                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5">
-                                                    <polyline points="20 6 9 17 4 12"/>
-                                                </svg>
-                                            </span>
-                                            <span>{{ kual }}</span>
-                                        </li>
-                                    </ul>
-                                </div>
-
                                 <!-- Jurusan yang Diutamakan -->
                                 <div v-if="posisi.jurusan?.length" class="mt-5">
                                     <h4 class="text-xs font-semibold uppercase tracking-wider text-ink-500 mb-2">Jurusan yang Diutamakan</h4>
@@ -143,19 +129,22 @@ const statusMeta = (division) => {
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-ink-500">Total Kuota</span>
-                                <span class="font-bold text-forest-700">{{ props.division.terisi_total }} / {{ props.division.kuota_total }} Terisi</span>
+                                <span v-if="Number(props.division.terisi_total ?? 0) > Number(props.division.kuota_total ?? 0)" class="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 font-semibold text-amber-700 border border-amber-200/60">
+                                    Kuota Penuh
+                                </span>
+                                <span v-else class="font-bold text-forest-700">{{ props.division.terisi_total }} / {{ props.division.kuota_total }} Terisi</span>
                             </div>
 
                             <div>
                                 <div class="flex items-center justify-between text-xs font-medium text-ink-500">
-                                    <span>Slot tersisa: {{ props.division.sisa_total }}</span>
-                                    <span class="font-semibold text-ink-700">{{ props.division.persentase }}%</span>
+                                    <span v-if="isFull" class="font-semibold text-amber-700">Kuota Penuh</span>
+                                    <span v-else>Slot tersisa: {{ props.division.sisa_total ?? props.division.kuota_sisa }}</span>
                                 </div>
                                 <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink-100">
                                     <div
                                         class="h-full rounded-full transition-all duration-500"
                                         :class="statusMeta(props.division).bar"
-                                        :style="{ width: Math.min(100, Number(props.division.persentase ?? 0)) + '%' }"
+                                        :style="{ width: Math.min(100, Math.round((Number(props.division.terisi_total ?? 0) / Math.max(1, Number(props.division.kuota_total ?? 1))) * 100)) + '%' }"
                                     ></div>
                                 </div>
                             </div>
@@ -169,19 +158,27 @@ const statusMeta = (division) => {
                         </div>
 
                         <div class="pt-3 border-t border-ink-300/30">
-                            <Link v-if="user" :href="route('pengajuan.index', { division: props.division.id })" class="btn-primary w-full text-center text-sm">
+                            <button
+                                v-if="isFull"
+                                disabled
+                                type="button"
+                                class="w-full inline-flex items-center justify-center rounded-xl bg-ink-200/70 px-4 py-3 text-sm font-semibold text-ink-400 cursor-not-allowed text-center select-none"
+                            >
+                                Kuota Penuh
+                            </button>
+                            <Link v-else-if="user" :href="route('pengajuan.index', { division: props.division.id })" class="btn-primary w-full text-center text-sm">
                                 Ajukan Sekarang
                             </Link>
                             <a v-else :href="route('auth.google')" class="btn-primary w-full text-center text-sm">
                                 Daftar Sekarang
                             </a>
                             <p class="mt-3 text-center text-[11px] leading-relaxed text-ink-500">
-                                {{ user ? 'Lanjutkan mengisi formulir pengajuan PKL untuk bidang ini.' : 'Anda akan diarahkan ke halaman login Google untuk melanjutkan pendaftaran.' }}
+                                {{ isFull ? 'Pendaftaran ditutup karena kuota untuk bidang ini sudah terpenuhi.' : (user ? 'Lanjutkan mengisi formulir pengajuan PKL untuk bidang ini.' : 'Anda akan diarahkan ke halaman login Google untuk melanjutkan pendaftaran.') }}
                             </p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </PublicLayout>
+    </component>
 </template>
