@@ -1,5 +1,16 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
+const page = usePage();
+const user = computed(() => page.props.auth?.user);
+const roles = computed(() => page.props.auth?.roles || []);
+
+const portalRoute = computed(() => {
+    if (roles.value.includes('super_admin')) return route('superadmin.dashboard');
+    if (roles.value.includes('agency_admin')) return route('admin.dashboard');
+    return route('home');
+});
 </script>
 
 <template>
@@ -19,10 +30,24 @@ import { Link } from '@inertiajs/vue3';
                     </div>
                 </Link>
 
-                <div class="flex items-center gap-2">
-                    <Link :href="route('login')" class="btn-primary px-5 py-2.5 text-sm">
-                        Login
-                    </Link>
+                <div class="flex items-center gap-3">
+                    <template v-if="user">
+                        <Link :href="portalRoute" class="flex items-center gap-2 rounded-xl bg-forest-50 px-3.5 py-2 text-xs font-semibold text-forest-800 transition hover:bg-forest-100">
+                            <span class="grid h-6 w-6 place-items-center rounded-lg bg-forest-700 text-white font-bold text-[10px]">
+                                {{ (user.nama_lengkap || user.name || 'U')[0] }}
+                            </span>
+                            <span class="hidden sm:inline">Portal Saya ({{ user.nama_lengkap || user.name }})</span>
+                            <span class="sm:hidden">Portal</span>
+                        </Link>
+                        <Link :href="route('logout')" method="post" as="button" class="btn-secondary px-3.5 py-2 text-xs">
+                            Keluar
+                        </Link>
+                    </template>
+                    <template v-else>
+                        <Link :href="route('login')" class="btn-primary px-5 py-2.5 text-sm">
+                            Login
+                        </Link>
+                    </template>
                 </div>
             </div>
         </header>

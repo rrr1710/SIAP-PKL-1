@@ -215,7 +215,7 @@ const submitReupload = () => {
             <h2 class="font-display text-xl font-bold text-ink-900">Belum Ada Pengajuan PKL</h2>
             <p class="mt-2 text-sm text-ink-500">Anda belum mendaftar pada posisi atau bidang PKL manapun.</p>
             <div class="mt-6">
-                <Link :href="route('bidang.index')" class="btn-primary px-6 py-2.5">
+                <Link :href="route('katalog.index')" class="btn-primary px-6 py-2.5">
                     Lihat Bidang PKL
                 </Link>
             </div>

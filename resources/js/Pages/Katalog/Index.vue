@@ -1,7 +1,7 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import BidangCard from '@/Components/BidangCard.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import {
     Search,
@@ -24,6 +24,24 @@ const props = defineProps({
 const search = ref(props.filters.search || '');
 const instansi = ref(props.filters.instansi || '');
 const status = ref(props.filters.status || '');
+
+const page = usePage();
+const isAuthenticated = computed(() => !!page.props.auth?.user);
+
+const getPrimaryCta = (item) => {
+    if (isAuthenticated.value) {
+        return {
+            label: 'Daftar Sekarang',
+            href: route('pengajuan.index', { division: item.id }),
+            external: false,
+        };
+    }
+    return {
+        label: 'Daftar Sekarang',
+        href: route('auth.google'),
+        external: true,
+    };
+};
 
 const hasActiveFilter = computed(
     () => search.value !== '' || instansi.value !== '' || status.value !== ''
@@ -160,7 +178,7 @@ const resetFilters = () => {
                     :key="item.id"
                     :item="item"
                     :detail-href="route('katalog.show', item.slug)"
-                    :primary="{ label: 'Daftar Sekarang', href: route('auth.google') }"
+                    :primary="getPrimaryCta(item)"
                 />
             </div>
 

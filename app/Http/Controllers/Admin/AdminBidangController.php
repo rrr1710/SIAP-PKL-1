@@ -3,26 +3,28 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Division;
+use App\Models\PesertaMagang;
+use App\Models\SubInstansi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class AdminBidangController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $divisions = $this->withQuota(
-            $this->queryFor(request()->user())
-                ->withCount(['applications as accepted_count' => fn ($query) => $query->where('status', 'accepted')->excludeDummy()])
-                ->latest()
-                ->get(),
-        );
+        $subInstansiList = $this->queryFor($request->user())
+            ->withCount([
+                'pesertaMagang as peserta_aktif_count' => fn ($q) => $q->where('status_magang', 'aktif'),
+            ])
+            ->latest()
+            ->get()
+            ->map(fn (SubInstansi $sub) => $this->withQuota($sub));
 
         return Inertia::render('Admin/Bidang/Index', [
             'activeNav' => 'admin.bidang',
-            'divisions' => $divisions,
+            'subInstansiList' => $subInstansiList,
+            'divisions' => $subInstansiList,
         ]);
     }
 
@@ -36,112 +38,139 @@ class AdminBidangController extends Controller
         $data = $this->validated($request);
 
         DB::transaction(function () use ($request, $data) {
-            $this->queryFor($request->user())->create([
-                'agency_id' => $request->user()->agency_id,
-                'slug' => Str::slug($data['nama']).'-'.Str::lower(Str::random(6)),
-                'nama' => $data['nama'],
-                'kategori' => $data['kategori'] ?? 'Umum',
-                'instansi' => $request->user()->agency?->name ?? $data['instansi'] ?? '',
+            SubInstansi::create([
+                'id_instansi' => $request->user()->id_instansi,
+                'nama_sub_instansi' => $data['nama_sub_instansi'],
                 'deskripsi' => $data['deskripsi'],
-                'quota' => $data['kuota_total'],
-                'jurusan' => $this->parseJurusan($data['jurusan'] ?? ''),
+                'batas_kuota' => $data['batas_kuota'],
             ]);
         });
 
         return to_route('admin.bidang.index')->with('success', 'Bidang berhasil dibuat.');
     }
 
-    public function show($bidang)
+    public function show(Request $request, SubInstansi $bidang)
     {
-        $division = $this->withQuota(
-            $this->queryFor(request()->user())
-                ->withCount(['applications as accepted_count' => fn ($query) => $query->where('status', 'accepted')->excludeDummy()])
-                ->findOrFail($bidang),
-        );
+        $this->authorizeSubInstansi($bidang, $request->user());
 
-        return Inertia::render('Admin/Bidang/Show', ['activeNav' => 'admin.bidang', 'bidang' => $division]);
+        $bidang->loadCount([
+            'pesertaMagang as peserta_aktif_count' => fn ($q) => $q->where('status_magang', 'aktif'),
+        ]);
+
+        return Inertia::render('Admin/Bidang/Show', [
+            'activeNav' => 'admin.bidang',
+            'bidang' => $this->withQuota($bidang),
+        ]);
     }
 
-    public function edit($bidang)
+    public function edit(Request $request, SubInstansi $bidang)
     {
-        $division = $this->queryFor(request()->user())->findOrFail($bidang);
+        $this->authorizeSubInstansi($bidang, $request->user());
 
-        return Inertia::render('Admin/Bidang/Edit', ['activeNav' => 'admin.bidang', 'bidang' => $division]);
+        $bidangData = array_merge($bidang->toArray(), [
+            'nama' => $bidang->nama_sub_instansi,
+            'nama_sub_instansi' => $bidang->nama_sub_instansi,
+            'quota' => $bidang->batas_kuota,
+            'kuota_total' => $bidang->batas_kuota,
+            'batas_kuota' => $bidang->batas_kuota,
+            'jurusan' => [],
+        ]);
+
+        return Inertia::render('Admin/Bidang/Edit', [
+            'activeNav' => 'admin.bidang',
+            'bidang' => $bidangData,
+        ]);
     }
 
-    public function update(Request $request, $bidang)
+    public function update(Request $request, SubInstansi $bidang)
     {
-        $division = $this->queryFor($request->user())->findOrFail($bidang);
+        $this->authorizeSubInstansi($bidang, $request->user());
         $data = $this->validated($request);
 
-        DB::transaction(function () use ($division, $data) {
-            $division->update([
-                'nama' => $data['nama'],
-                'kategori' => $data['kategori'] ?? $division->kategori,
+        DB::transaction(function () use ($bidang, $data) {
+            $bidang->update([
+                'nama_sub_instansi' => $data['nama_sub_instansi'],
                 'deskripsi' => $data['deskripsi'],
-                'quota' => $data['kuota_total'],
-                'jurusan' => $this->parseJurusan($data['jurusan'] ?? ''),
+                'batas_kuota' => $data['batas_kuota'],
             ]);
         });
 
-        return to_route('admin.bidang.show', $division)->with('success', 'Bidang berhasil diperbarui.');
+        return to_route('admin.bidang.show', $bidang)->with('success', 'Bidang berhasil diperbarui.');
     }
 
-    public function destroy(Request $request, $bidang)
+    public function destroy(Request $request, SubInstansi $bidang)
     {
-        $division = $this->queryFor($request->user())->findOrFail($bidang);
-        abort_if($division->applications()->excludeDummy()->exists(), 422, 'Bidang yang sudah memiliki pengajuan tidak dapat dihapus.');
-        $division->delete();
+        $this->authorizeSubInstansi($bidang, $request->user());
+
+        abort_if(
+            $bidang->permohonanPkl()->exists(),
+            422,
+            'Bidang yang sudah memiliki pengajuan tidak dapat dihapus.'
+        );
+
+        $bidang->delete();
 
         return to_route('admin.bidang.index')->with('success', 'Bidang berhasil dihapus.');
     }
 
     private function queryFor($user)
     {
-        return $user->agency_id
-            ? Division::query()->where('agency_id', $user->agency_id)
-            : Division::query()->whereNull('agency_id');
+        return SubInstansi::query()->where('id_instansi', $user->id_instansi);
     }
 
-    private function withQuota($divisions)
+    private function authorizeSubInstansi(SubInstansi $sub, $user): void
     {
-        return $divisions instanceof Division
-            ? $this->setQuotaAttributes($divisions)
-            : $divisions->map(fn (Division $division) => $this->setQuotaAttributes($division));
+        abort_unless($sub->id_instansi === $user->id_instansi, 403);
     }
 
-    private function setQuotaAttributes(Division $division): Division
+    private function withQuota(SubInstansi $sub): SubInstansi
     {
-        $quota = (int) $division->quota;
-        $terisi = (int) ($division->accepted_count ?? 0);
+        $kuota = (int) $sub->batas_kuota;
+        $terisi = (int) ($sub->peserta_aktif_count ?? 0);
+        $sisa = max(0, $kuota - $terisi);
+        $sisaPct = $kuota > 0 ? ($sisa / $kuota) * 100 : 0;
 
-        $division->setAttribute('kuota_total', $quota);
-        $division->setAttribute('terisi_total', $terisi);
-        $sisa = max(0, $quota - $terisi);
-        $sisaPercent = $quota > 0 ? ($sisa / $quota) * 100 : 0;
-        $division->setAttribute('status', $sisa <= 0 ? 'penuh' : ($sisaPercent > 50 ? 'tersedia' : ($sisaPercent >= 20 ? 'menipis' : 'hampir-penuh')));
+        $sub->setAttribute('nama', $sub->nama_sub_instansi);
+        $sub->setAttribute('kuota_total', $kuota);
+        $sub->setAttribute('terisi_total', $terisi);
+        $sub->setAttribute('sisa_total', $sisa);
+        $sub->setAttribute('status', $sisa <= 0 ? 'penuh' : ($sisaPct > 50 ? 'tersedia' : ($sisaPct >= 20 ? 'menipis' : 'hampir-penuh')));
 
-        return $division;
+        return $sub;
     }
 
     private function validated(Request $request): array
     {
-        return $request->validate([
-            'nama' => ['required', 'string', 'max:255'],
-            'kategori' => ['nullable', 'string', 'max:255'],
-            'instansi' => ['nullable', 'string', 'max:255'],
-            'deskripsi' => ['required', 'string'],
-            'kuota_total' => ['required', 'integer', 'min:1'],
-            'jurusan' => ['nullable', 'string'],
-        ]);
-    }
+        $input = $request->all();
+        if (!isset($input['nama_sub_instansi']) && isset($input['nama'])) {
+            $input['nama_sub_instansi'] = $input['nama'];
+        }
+        if (!isset($input['batas_kuota'])) {
+            if (isset($input['kuota_total'])) {
+                $input['batas_kuota'] = $input['kuota_total'];
+            } elseif (isset($input['kuota'])) {
+                $input['batas_kuota'] = $input['kuota'];
+            }
+        }
+        $request->merge($input);
 
-    private function parseJurusan(?string $jurusan): array
-    {
-        return collect(explode(',', (string) $jurusan))
-            ->map(fn ($value) => trim($value))
-            ->filter()
-            ->values()
-            ->all();
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'nama_sub_instansi' => ['required', 'string', 'max:255'],
+            'deskripsi' => ['nullable', 'string'],
+            'batas_kuota' => ['required', 'integer', 'min:1'],
+        ]);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            if ($errors->has('nama_sub_instansi')) {
+                $errors->add('nama', $errors->first('nama_sub_instansi'));
+            }
+            if ($errors->has('batas_kuota')) {
+                $errors->add('kuota_total', $errors->first('batas_kuota'));
+            }
+            throw new \Illuminate\Validation\ValidationException($validator);
+        }
+
+        return $validator->validated();
     }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Application;
-use App\Models\Division;
+use App\Models\PermohonanPkl;
+use App\Models\SubInstansi;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -13,26 +13,27 @@ class HomeController extends Controller
     {
         $userId = $request->user()->id;
 
-        $pengajuanAktif = Application::with('division')
-            ->where('user_id', $userId)
-            ->whereIn('status', ['pending', 'accepted', 'revision'])
+        $permohonanAktif = PermohonanPkl::with('subInstansi.instansi')
+            ->where('id_pemohon', $userId)
+            ->whereIn('status', ['menunggu', 'diterima'])
             ->latest()
             ->first();
 
         return Inertia::render('Home', [
             'activeNav' => 'home',
             'stats' => [
-                'lowongan_tersedia' => Division::count(),
-                'pendaftaran' => Application::where('user_id', $userId)->count(),
-                'menunggu_verifikasi' => Application::where('user_id', $userId)
-                    ->whereIn('status', ['pending', 'revision'])->count(),
-                'diterima' => Application::where('user_id', $userId)->where('status', 'accepted')->count(),
+                'lowongan_tersedia' => SubInstansi::count(),
+                'pendaftaran' => PermohonanPkl::where('id_pemohon', $userId)->count(),
+                'menunggu_verifikasi' => PermohonanPkl::where('id_pemohon', $userId)
+                    ->where('status', 'menunggu')->count(),
+                'diterima' => PermohonanPkl::where('id_pemohon', $userId)
+                    ->where('status', 'diterima')->count(),
             ],
-            'pendaftaranAktif' => $pengajuanAktif ? [
-                'judul' => $pengajuanAktif->division?->nama ?? 'Pengajuan PKL',
-                'instansi' => $pengajuanAktif->division?->instansi ?? '-',
-                'tanggal' => $pengajuanAktif->created_at?->translatedFormat('d M Y') ?? '-',
-                'status' => $pengajuanAktif->status,
+            'pendaftaranAktif' => $permohonanAktif ? [
+                'judul' => $permohonanAktif->subInstansi?->nama_sub_instansi ?? 'Pengajuan PKL',
+                'instansi' => $permohonanAktif->subInstansi?->instansi?->nama_instansi ?? '-',
+                'tanggal' => $permohonanAktif->created_at?->translatedFormat('d M Y') ?? '-',
+                'status' => $permohonanAktif->status,
             ] : null,
             'pengumuman' => [],
         ]);

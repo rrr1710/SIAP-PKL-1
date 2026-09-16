@@ -4,13 +4,17 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 
 const form = useForm({
     nama: '',
+    nama_sub_instansi: '',
     kategori: '',
     deskripsi: '',
     kuota_total: '',
+    batas_kuota: '',
     jurusan: '',
 });
 
 const submitForm = () => {
+    form.nama_sub_instansi = form.nama;
+    form.batas_kuota = form.kuota_total;
     form.post(route('admin.bidang.store'));
 };
 </script>

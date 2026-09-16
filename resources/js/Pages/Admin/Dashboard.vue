@@ -122,13 +122,13 @@ const bidangAktif = computed(() => props.bidangAktif.map((item) => ({
                 <ul class="space-y-4">
                     <li v-for="item in bidangAktif" :key="item.id" class="rounded-xl border border-ink-300/40 bg-white/50 p-4 shadow-sm">
                         <div class="flex items-center justify-between">
-                            <p class="text-sm font-semibold text-ink-900">{{ item.nama }}</p>
-                            <span class="text-xs font-medium text-ink-500">{{ item.terisi }}/{{ item.kuota }}</span>
+                            <p class="text-sm font-semibold text-ink-900">{{ item.nama || item.nama_sub_instansi || ('Bidang #' + item.id) }}</p>
+                            <span class="text-xs font-medium text-ink-500">{{ item.terisi ?? 0 }}/{{ item.kuota || item.batas_kuota || 0 }}</span>
                         </div>
                         <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink-100">
                             <div
                                 class="h-full rounded-full bg-forest-500 transition-all"
-                                :style="{ width: `${(item.terisi / item.kuota) * 100}%` }"
+                                :style="{ width: `${Math.min(100, Math.round(((item.terisi ?? 0) / Math.max(1, item.kuota || item.batas_kuota || 1)) * 100))}%` }"
                             />
                         </div>
                     </li>

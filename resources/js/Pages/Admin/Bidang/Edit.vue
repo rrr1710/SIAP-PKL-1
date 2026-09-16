@@ -5,14 +5,18 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 const props = defineProps({ bidang: { type: Object, required: true } });
 
 const form = useForm({
-    nama: props.bidang.nama ?? '',
+    nama: props.bidang.nama ?? props.bidang.nama_sub_instansi ?? '',
+    nama_sub_instansi: props.bidang.nama_sub_instansi ?? props.bidang.nama ?? '',
     kategori: props.bidang.kategori ?? '',
     deskripsi: props.bidang.deskripsi ?? '',
-    kuota_total: props.bidang.quota ?? '',
+    kuota_total: props.bidang.quota ?? props.bidang.batas_kuota ?? '',
+    batas_kuota: props.bidang.batas_kuota ?? props.bidang.quota ?? '',
     jurusan: (props.bidang.jurusan ?? []).join(', '),
 });
 
 const submitForm = () => {
+    form.nama_sub_instansi = form.nama;
+    form.batas_kuota = form.kuota_total;
     form.put(route('admin.bidang.update', props.bidang.id));
 };
 </script>

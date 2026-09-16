@@ -1,6 +1,10 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
+const page = usePage();
+const user = computed(() => page.props.auth?.user);
 
 const props = defineProps({
     division: { type: Object, required: true },
@@ -165,11 +169,14 @@ const statusMeta = (division) => {
                         </div>
 
                         <div class="pt-3 border-t border-ink-300/30">
-                            <Link :href="route('auth.google')" class="btn-primary w-full text-center text-sm">
-                                Daftar Sekarang
+                            <Link v-if="user" :href="route('pengajuan.index', { division: props.division.id })" class="btn-primary w-full text-center text-sm">
+                                Ajukan Sekarang
                             </Link>
+                            <a v-else :href="route('auth.google')" class="btn-primary w-full text-center text-sm">
+                                Daftar Sekarang
+                            </a>
                             <p class="mt-3 text-center text-[11px] leading-relaxed text-ink-500">
-                                Anda akan diarahkan ke halaman login Google untuk melanjutkan pendaftaran.
+                                {{ user ? 'Lanjutkan mengisi formulir pengajuan PKL untuk bidang ini.' : 'Anda akan diarahkan ke halaman login Google untuk melanjutkan pendaftaran.' }}
                             </p>
                         </div>
                     </div>

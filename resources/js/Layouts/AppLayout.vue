@@ -20,9 +20,9 @@ const isAdmin = computed(() => (page.props.auth?.roles ?? []).includes('agency_a
 
 const studentNav = [
     { label: 'Home', href: route('home'), active: 'home', icon: 'home' },
-    { label: 'Bidang PKL', href: route('bidang.index'), active: 'bidang', icon: 'briefcase' },
+    { label: 'Katalog Bidang', href: route('katalog.index'), active: 'katalog', icon: 'briefcase' },
     { label: 'Pengajuan PKL', href: route('pengajuan.index'), active: 'pengajuan', icon: 'file-text' },
-    { label: 'Kelompok Saya', href: route('kelompok.index'), active: 'kelompok', icon: 'users' },
+    { label: 'Status Pendaftaran', href: route('status.index'), active: 'status', icon: 'check-circle' },
     { label: 'Riwayat', href: route('riwayat.index'), active: 'riwayat', icon: 'clock' },
     { label: 'Profile Saya', href: route('profile.edit'), active: 'profile', icon: 'user' },
 ];
@@ -136,6 +136,11 @@ const current = page.props.activeNav ?? '';
                         <template v-else-if="item.icon === 'users'">
                             <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8">
                                 <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+                            </svg>
+                        </template>
+                        <template v-else-if="item.icon === 'check-circle'">
+                            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
                             </svg>
                         </template>
                         <template v-else-if="item.icon === 'clock'">

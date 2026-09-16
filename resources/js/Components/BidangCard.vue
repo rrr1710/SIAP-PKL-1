@@ -121,16 +121,25 @@ const statusMeta = (item) => {
 
         <!-- Aksi -->
         <div class="mt-auto grid grid-cols-2 gap-3 border-t border-ink-300/30 pt-5">
-            <Link :href="detailHref" class="btn-secondary px-3 py-2.5 text-xs">
+            <Link :href="detailHref" class="btn-secondary px-3 py-2.5 text-xs text-center">
                 Lihat Detail
             </Link>
-            <Link
-                v-if="primary"
-                :href="primary.href"
-                class="btn-primary px-3 py-2.5 text-xs"
-            >
-                {{ primary.label }}
-            </Link>
+            <template v-if="primary">
+                <a
+                    v-if="primary.external || primary.href?.includes('/auth/')"
+                    :href="primary.href"
+                    class="btn-primary px-3 py-2.5 text-xs text-center"
+                >
+                    {{ primary.label }}
+                </a>
+                <Link
+                    v-else
+                    :href="primary.href"
+                    class="btn-primary px-3 py-2.5 text-xs text-center"
+                >
+                    {{ primary.label }}
+                </Link>
+            </template>
             <span
                 v-else
                 class="inline-flex items-center justify-center rounded-lg border border-dashed border-ink-300 px-3 py-2.5 text-xs text-ink-400"

@@ -5,27 +5,27 @@ use App\Http\Controllers\Admin\AdminBidangController;
 use App\Http\Controllers\Admin\AdminApplicationController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\HomeController;
-use App\Http\Controllers\KelompokController;
-use App\Http\Controllers\BidangController;
 use App\Http\Controllers\PengajuanPklController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicCatalogController;
 use App\Http\Controllers\RiwayatController;
 use App\Http\Controllers\StatusPendaftaranController;
+use App\Models\SubInstansi;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SuperAdmin\AuditLogController;
 
-Route::middleware(['auth', 'role:super-admin']) // sesuaikan middleware role-mu
-    ->prefix('super-admin')
-    ->group(function () {
-        Route::get('/audit-log', [AuditLogController::class, 'index'])->name('super-admin.audit-log');
-    });
-
+// Redirect root to public catalog
 Route::get('/', fn () => redirect()->route('katalog.index'));
 
-// Public Catalog (accessible without login / guest)
+// Public Catalog (accessible without login)
 Route::get('/katalog', [PublicCatalogController::class, 'index'])->name('katalog.index');
-Route::get('/katalog/{division}', [PublicCatalogController::class, 'show'])->name('katalog.show');
+Route::get('/katalog/{subInstansi}', [PublicCatalogController::class, 'show'])
+    ->name('katalog.show');
+
+// Route aliases for backward compatibility with frontend links
+Route::get('/bidang', fn () => redirect()->route('katalog.index'))->name('bidang.index');
+Route::get('/bidang/{subInstansi}', fn ($subInstansi) => redirect()->route('katalog.show', $subInstansi))->name('bidang.show');
+Route::get('/kelompok', fn () => redirect()->route('pengajuan.index'))->name('kelompok.index');
 
 // Google OAuth Routes
 Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('auth.google');
@@ -33,23 +33,22 @@ Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->
 
 // Auth routes (requires authentication)
 Route::middleware('auth')->group(function () {
-    // Student Portal Routes (hanya user ber-role 'student')
+
+    // Student Portal Routes
     Route::middleware('ensure.onboarded')->group(function () {
         Route::get('/dashboard', fn () => redirect()->route('home'))->name('dashboard');
         Route::get('/home', [HomeController::class, 'index'])->name('home');
 
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
 
-        Route::get('/bidang', [BidangController::class, 'index'])->name('bidang.index');
-        Route::get('/bidang/{division}', [BidangController::class, 'show'])->name('bidang.show');
         Route::get('/pengajuan', [PengajuanPklController::class, 'index'])->name('pengajuan.index');
         Route::get('/pengajuan/check-availability', [PengajuanPklController::class, 'checkAvailability'])->name('pengajuan.check-availability');
         Route::post('/pengajuan', [PengajuanPklController::class, 'store'])->name('pengajuan.store');
-        Route::post('/pengajuan/{application}/reupload', [PengajuanPklController::class, 'reupload'])->name('pengajuan.reupload');
-        Route::middleware('ensure.kelompok')->group(function () {
-            Route::get('/kelompok', [KelompokController::class, 'index'])->name('kelompok.index');
-            Route::post('/kelompok/anggota', [KelompokController::class, 'storeAnggota'])->name('kelompok.anggota.store');
-        });
+        Route::post('/pengajuan/{permohonan}/reupload', [PengajuanPklController::class, 'reupload'])->name('pengajuan.reupload');
+        Route::get('/proposal/{permohonan}/download', [PengajuanPklController::class, 'downloadSignedDocument'])
+            ->name('proposal.download')
+            ->middleware('signed');
+
         Route::get('/status', [StatusPendaftaranController::class, 'index'])->name('status.index');
         Route::get('/riwayat', [RiwayatController::class, 'index'])->name('riwayat.index');
     });
@@ -86,9 +85,31 @@ Route::middleware('auth')->group(function () {
         Route::get('/instansi/{instansi}', fn () => \Inertia\Inertia::render('SuperAdmin/Instansi/Show', ['activeNav' => 'superadmin.instansi']))->name('instansi.show');
 
         Route::get('/undangan', fn () => \Inertia\Inertia::render('SuperAdmin/Undangan/Index', ['activeNav' => 'superadmin.undangan']))->name('undangan.index');
-
-        Route::get('/audit-log', fn () => \Inertia\Inertia::render('SuperAdmin/AuditLog/Index', ['activeNav' => 'superadmin.audit-log']))->name('audit-log.index');
+        Route::get('/audit-log', [AuditLogController::class, 'index'])->name('audit-log.index');
     });
 });
 
-require __DIR__.'/auth.php';
+// Development Quick-Login Route (local testing only)
+if (app()->environment('local')) {
+    Route::get('/dev-login/{role}', function (string $role) {
+        $targetUser = match ($role) {
+            'superadmin', 'super_admin' => \App\Models\User::role('super_admin')->first(),
+            'admin', 'agency_admin' => \App\Models\User::role('agency_admin')->first(),
+            default => \App\Models\User::role('student')->first() ?? \App\Models\User::first(),
+        };
+
+        if (!$targetUser) {
+            return response("User with role '{$role}' not found in database. Run: php -d browscap=\"\" artisan db:seed", 404);
+        }
+
+        \Illuminate\Support\Facades\Auth::login($targetUser);
+
+        return match ($role) {
+            'superadmin', 'super_admin' => redirect()->route('superadmin.dashboard'),
+            'admin', 'agency_admin' => redirect()->route('admin.dashboard'),
+            default => redirect()->route('home'),
+        };
+    })->name('dev.login');
+}
+
+require __DIR__ . '/auth.php';

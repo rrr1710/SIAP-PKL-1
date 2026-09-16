@@ -1,9 +1,20 @@
 <script setup>
+import { computed } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 
-defineProps({
+const props = defineProps({
     divisions: { type: Array, default: () => [] },
+    subInstansiList: { type: Array, default: () => [] },
+});
+
+const divisionList = computed(() => {
+    const list = props.divisions?.length ? props.divisions : props.subInstansiList;
+    return (list || []).map((d) => ({
+        id: d.id,
+        nama: d.nama ?? d.nama_sub_instansi ?? 'Bidang #' + d.id,
+        quota: d.quota ?? d.batas_kuota ?? 0,
+    }));
 });
 
 const form = useForm({
@@ -61,7 +72,7 @@ const submitForm = () => form.post(route('admin.peserta.walk-in.store'));
                             <label class="field-label" for="division_id">Bidang PKL</label>
                             <select id="division_id" v-model="form.division_id" required class="field-input">
                                 <option value="" disabled>Pilih bidang</option>
-                                <option v-for="division in divisions" :key="division.id" :value="division.id">
+                                <option v-for="division in divisionList" :key="division.id" :value="division.id">
                                     {{ division.nama }} (kuota {{ division.quota }})
                                 </option>
                             </select>
