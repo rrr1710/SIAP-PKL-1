@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PermohonanPkl;
 use App\Models\PesertaMagang;
 use App\Models\SubInstansi;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -139,6 +140,18 @@ class AdminApplicationController extends Controller
             }
         });
 
+        // Audit trail
+        $actionLabel = match ($normalizedStatus) {
+            'diterima' => 'Terima Pengajuan',
+            'ditolak'  => 'Tolak Pengajuan',
+            'revisi'   => 'Revisi Pengajuan',
+            default    => 'Ubah Status Pengajuan',
+        };
+        AuditLogger::log($actionLabel, $permohonan, $request, [
+            'status_baru' => $normalizedStatus,
+            'catatan'     => $catatanAdmin,
+        ]);
+
         return back()->with('success', 'Status pengajuan berhasil diperbarui.');
     }
 
@@ -150,6 +163,8 @@ class AdminApplicationController extends Controller
         abort_unless($peserta->status_magang === 'aktif', 422, 'Peserta sudah tidak aktif.');
 
         $peserta->update(['status_magang' => 'selesai']);
+
+        AuditLogger::log('Selesaikan Peserta', $peserta, $request);
 
         return back()->with('success', 'Status peserta berhasil diubah menjadi Selesai.');
     }
@@ -285,17 +300,20 @@ class AdminApplicationController extends Controller
         $sub = SubInstansi::where('id_instansi', $request->user()->id_instansi)
             ->findOrFail($data['id_sub_instansi']);
 
-        // Admin walk-in registration bypasses capacity check intentionally
-        PesertaMagang::create([
+        $peserta = PesertaMagang::create([
             'id_sub_instansi' => $sub->id,
-            'id_permohonan' => null,
-            'nama_peserta' => $data['nama_peserta'],
-            'nim' => $data['nim'] ?? null,
-            'sekolah' => $data['sekolah'],
-            'no_hp' => $data['no_hp'],
-            'tanggal_mulai' => $data['tanggal_mulai'],
+            'id_permohonan'   => null,
+            'nama_peserta'    => $data['nama_peserta'],
+            'nim'             => $data['nim'] ?? null,
+            'sekolah'         => $data['sekolah'],
+            'no_hp'           => $data['no_hp'],
+            'tanggal_mulai'   => $data['tanggal_mulai'],
             'tanggal_selesai' => $data['tanggal_selesai'],
-            'status_magang' => 'aktif',
+            'status_magang'   => 'aktif',
+        ]);
+
+        AuditLogger::log('Tambah Walk-in', $peserta, $request, [
+            'bidang' => $sub->nama_sub_instansi,
         ]);
 
         return to_route('admin.peserta.index')->with('success', 'Peserta walk-in berhasil diregistrasikan.');

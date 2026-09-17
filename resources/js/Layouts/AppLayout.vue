@@ -17,6 +17,7 @@ watch(
 );
 
 const isAdmin = computed(() => (page.props.auth?.roles ?? []).includes('agency_admin'));
+const hasActiveApp = computed(() => page.props.auth?.has_active_application === true);
 
 const studentNav = [
     { label: 'Home', href: route('home'), active: 'home', icon: 'home' },
@@ -38,6 +39,8 @@ const adminNav = [
 const filteredNav = computed(() => {
     const nav = isAdmin.value ? adminNav : studentNav;
     return nav.filter((item) => {
+        // Hide 'Pengajuan PKL' when user already has an active/accepted application
+        if (item.label === 'Pengajuan PKL' && hasActiveApp.value) return false;
         if (item.label === 'Kelompok Saya') {
             return page.props.auth?.user?.tipe_pendaftaran === 'kelompok';
         }

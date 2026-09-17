@@ -13,6 +13,8 @@ use App\Http\Controllers\StatusPendaftaranController;
 use App\Models\SubInstansi;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SuperAdmin\AuditLogController;
+use App\Http\Controllers\SuperAdmin\SuperAdminUndanganController;
+use App\Http\Controllers\SuperAdmin\SuperAdminInstansiController;
 
 // Redirect root to public catalog
 Route::get('/', fn () => redirect()->route('katalog.index'));
@@ -82,10 +84,11 @@ Route::middleware('auth')->group(function () {
     Route::prefix('super-admin')->name('superadmin.')->middleware('ensure.super_admin')->group(function () {
         Route::get('/dashboard', fn () => \Inertia\Inertia::render('SuperAdmin/Dashboard', ['activeNav' => 'superadmin.dashboard']))->name('dashboard');
 
-        Route::get('/instansi', fn () => \Inertia\Inertia::render('SuperAdmin/Instansi/Index', ['activeNav' => 'superadmin.instansi']))->name('instansi.index');
-        Route::get('/instansi/{instansi}', fn () => \Inertia\Inertia::render('SuperAdmin/Instansi/Show', ['activeNav' => 'superadmin.instansi']))->name('instansi.show');
+        Route::get('/instansi', [SuperAdminInstansiController::class, 'index'])->name('instansi.index');
+        Route::get('/instansi/{instansi}', [SuperAdminInstansiController::class, 'show'])->name('instansi.show');
 
-        Route::get('/undangan', fn () => \Inertia\Inertia::render('SuperAdmin/Undangan/Index', ['activeNav' => 'superadmin.undangan']))->name('undangan.index');
+        Route::get('/undangan', [SuperAdminUndanganController::class, 'index'])->name('undangan.index');
+        Route::post('/undangan', [SuperAdminUndanganController::class, 'store'])->name('undangan.store');
         Route::get('/audit-log', [AuditLogController::class, 'index'])->name('audit-log.index');
     });
 });

@@ -6,19 +6,12 @@ import { ref, reactive, computed } from 'vue';
 const search = ref('');
 const tipeFilter = ref('');
 
-const instansiList = ref([
-    { id: 1, nama: 'Dinas Komunikasi dan Informatika Kaltim', tipe: 'pemerintah', alamat: 'Jl. Kesuma Bangsa No. 12, Samarinda', email: 'admin@dkominfo.kaltimprov.go.id', jumlah_bidang_pkl: 6, jumlah_admin: 3 },
-    { id: 2, nama: 'Dinas Pendidikan dan Kebudayaan Kaltim', tipe: 'pemerintah', alamat: 'Jl. Bhayangkara No. 9, Samarinda', email: 'disdik@kaltimprov.go.id', jumlah_bidang_pkl: 4, jumlah_admin: 2 },
-    { id: 3, nama: 'RSUD Abdul Wahab Sjahranie', tipe: 'pemerintah', alamat: 'Jl. Palaran Ring Road I, Samarinda', email: 'humas@rsudaws.co.id', jumlah_bidang_pkl: 5, jumlah_admin: 4 },
-    { id: 4, nama: 'Bankaltimtara', tipe: 'swasta', alamat: 'Jl. Jend. Sudirman No. 20, Samarinda', email: 'cs@bankaltimtara.co.id', jumlah_bidang_pkl: 3, jumlah_admin: 2 },
-    { id: 5, nama: 'PT Pegadaian Cabang Samarinda', tipe: 'swasta', alamat: 'Jl. Pangeran Suriansyah No. 5, Samarinda', email: 'samarinda@pegadaian.co.id', jumlah_bidang_pkl: 2, jumlah_admin: 1 },
-    { id: 6, nama: 'Dinas Kesehatan Kaltim', tipe: 'pemerintah', alamat: 'Jl. Awang Long No. 10, Samarinda', email: 'dinkes@kaltimprov.go.id', jumlah_bidang_pkl: 4, jumlah_admin: 2 },
-    { id: 7, nama: 'PT Telkom Indonesia Witel Samarinda', tipe: 'swasta', alamat: 'Jl. Dr. Sutomo No. 3, Samarinda', email: 'hcsam@telkom.co.id', jumlah_bidang_pkl: 3, jumlah_admin: 3 },
-    { id: 8, nama: 'Dinas Pemuda dan Olahraga Kaltim', tipe: 'pemerintah', alamat: 'Jl. RE Martadinata No. 7, Samarinda', email: 'dispora@kaltimprov.go.id', jumlah_bidang_pkl: 2, jumlah_admin: 1 },
-]);
+const props = defineProps({
+    instansiList: { type: Array, default: () => [] }
+});
 
 const filteredInstansi = computed(() => {
-    return instansiList.value.filter((item) => {
+    return props.instansiList.filter((item) => {
         const matchSearch = !search.value || item.nama.toLowerCase().includes(search.value.toLowerCase());
         const matchTipe = !tipeFilter.value || item.tipe === tipeFilter.value;
         return matchSearch && matchTipe;

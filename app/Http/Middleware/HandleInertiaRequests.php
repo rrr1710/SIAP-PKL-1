@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\PermohonanPkl;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -29,17 +30,27 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
+        // Compute once; lazy closure so it only runs when Inertia actually serialises
+        $hasActiveApplication = $user
+            ? fn () => PermohonanPkl::where('id_pemohon', $user->id)
+                ->whereIn('status', ['menunggu', 'diterima'])
+                ->exists()
+            : false;
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user() ? array_merge($request->user()->toArray(), [
-                    'tipe_pendaftaran' => $request->user()->tipe_pendaftaran,
+                'user' => $user ? array_merge($user->toArray(), [
+                    'tipe_pendaftaran' => $user->tipe_pendaftaran,
                 ]) : null,
-                'roles' => $request->user() ? $request->user()->getRoleNames() : [],
+                'roles' => $user ? $user->getRoleNames() : [],
+                'has_active_application' => $hasActiveApplication,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
-                'error' => fn () => $request->session()->get('error'),
+                'error'   => fn () => $request->session()->get('error'),
             ],
         ];
     }

@@ -15,6 +15,18 @@ class PengajuanPklController extends Controller
 {
     public function index(Request $request)
     {
+        // Guard: redirect users who already have an active/accepted application
+        $hasActive = PermohonanPkl::where('id_pemohon', $request->user()->id)
+            ->whereIn('status', ['menunggu', 'diterima'])
+            ->exists();
+
+        if ($hasActive) {
+            return redirect()->route('status.index')
+                ->with('error', 'Anda sudah memiliki pengajuan yang diterima/aktif.');
+        }
+
+        $activePermohonan = null; // no active application at this point
+
         $activePermohonan = PermohonanPkl::where('id_pemohon', $request->user()->id)
             ->whereIn('status', ['menunggu', 'diterima'])
             ->with('subInstansi.instansi')
@@ -130,6 +142,35 @@ class PengajuanPklController extends Controller
             unset($input['anggota'], $input['members']);
         }
         $request->merge($input);
+
+        // ── Simplified flat-payload normalisation ──────────────────────────────
+        // The new Pengajuan/Index.vue form sends a flat payload (individual only):
+        //   id_sub_instansi, asal_instansi_pendidikan, jurusan, no_hp, document
+        // Derive the nested schema the validator below expects so we don't need
+        // a separate endpoint.
+        $isSimplified = !$request->has('tipe') && !$request->has('ketua');
+        if ($isSimplified) {
+            $user = $request->user();
+            $userName = $user->nama_lengkap ?? $user->name ?? $user->email ?? 'Pemohon';
+            $sekolah = $request->input('asal_instansi_pendidikan')
+                ?? $request->input('sekolah')
+                ?? '-';
+
+            $request->merge([
+                'tipe' => 'individu',
+                // Dates are open-ended for the simplified flow; admin sets them on approval
+                'tanggal_mulai'   => now()->toDateString(),
+                'tanggal_selesai' => now()->addMonths(3)->toDateString(),
+                'ketua' => [
+                    'nama_mahasiswa' => $userName,
+                    'nim'            => $user->nim ?? null,
+                    'sekolah'        => $sekolah,
+                    'no_hp'          => $request->input('no_hp', '-'),
+                ],
+                'asal_instansi_pendidikan' => $sekolah,
+            ]);
+        }
+        // ──────────────────────────────────────────────────────────────────────
 
         $rules = [
             'id_sub_instansi' => ['required', 'integer', 'exists:sub_instansi,id'],

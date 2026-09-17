@@ -3,38 +3,14 @@ import SuperAdminLayout from '@/Layouts/SuperAdminLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
-const instansi = ref({
-    id: 1,
-    nama: 'Dinas Komunikasi dan Informatika Kaltim',
-    tipe: 'pemerintah',
-    alamat: 'Jl. Kesuma Bangsa No. 12, Samarinda',
-    email: 'admin@dkominfo.kaltimprov.go.id',
-    deskripsi: 'Instansi teknis Penyelenggara Pusat Data & Layanan Informasi Pemerintah Provinsi Kalimantan Timur, membuka program PKL dalam bidang infrastruktur teknologi, aplikasi e-Government, serta kehumasan dan diseminasi informasi publik.',
-    created_at: '2026-08-01',
+const props = defineProps({
+    instansi: { type: Object, default: () => ({}) },
+    bidangPkl: { type: Array, default: () => [] },
+    adminList: { type: Array, default: () => [] },
 });
 
-const tipeBadge = () => {
-    return instansi.value.tipe === 'pemerintah' ? 'badge-info' : 'badge-warning';
-};
-
-const tipeLabel = () => {
-    return instansi.value.tipe === 'pemerintah' ? 'Pemerintah' : 'Swasta';
-};
-
-const bidangPkl = ref([
-    { id: 1, nama: 'Aplikasi dan Layanan E-Government', kuota: 8, terisi: 5, status: 'aktif' },
-    { id: 2, nama: 'Infrastruktur Jaringan dan Server', kuota: 6, terisi: 4, status: 'aktif' },
-    { id: 3, nama: 'Sekretariat dan Tata Usaha', kuota: 4, terisi: 3, status: 'aktif' },
-    { id: 4, nama: 'Diseminasi Informasi Publik', kuota: 5, terisi: 2, status: 'aktif' },
-    { id: 5, nama: 'Pengelolaan Data dan Statistik', kuota: 3, terisi: 3, status: 'penuh' },
-    { id: 6, nama: 'Hubungan Masyarakat dan Media', kuota: 4, terisi: 0, status: 'nonaktif' },
-]);
-
-const adminList = ref([
-    { id: 1, nama: 'Budi Santoso, S.Kom', email: 'budi.santoso@diskominfo.kaltim.go.id', status: true },
-    { id: 2, nama: 'Siti Aminah, S.Kom', email: 'siti.aminah@diskominfo.kaltim.go.id', status: true },
-    { id: 3, nama: 'Rudi Hartono', email: 'rudi.hartono@diskominfo.kaltim.go.id', status: false },
-]);
+const tipeBadge = () => props.instansi?.tipe === 'pemerintah' ? 'badge-info' : 'badge-warning';
+const tipeLabel = () => props.instansi?.tipe === 'pemerintah' ? 'Pemerintah' : 'Swasta';
 
 const statusBadge = (status) => {
     return status === 'aktif' ? 'badge-success' : status === 'penuh' ? 'badge-warning' : 'badge-danger';
@@ -162,8 +138,8 @@ const statusLabel = (status) => {
                                     <p class="truncate text-sm font-semibold text-ink-900">{{ admin.nama }}</p>
                                     <p class="truncate text-xs text-ink-500">{{ admin.email }}</p>
                                 </div>
-                                <span :class="admin.status ? 'badge-success' : 'badge-danger'" class="badge text-[10px]">
-                                    {{ admin.status ? 'Aktif' : 'Nonaktif' }}
+                                <span :class="admin.oauth_connected ? 'badge-success' : 'badge-warning'" class="badge text-[10px]">
+                                    {{ admin.oauth_connected ? 'Terhubung (Google)' : 'Belum Login / Draft' }}
                                 </span>
                             </div>
                         </li>

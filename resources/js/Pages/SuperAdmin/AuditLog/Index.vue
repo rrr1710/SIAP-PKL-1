@@ -1,46 +1,38 @@
 <script setup>
 import SuperAdminLayout from '@/Layouts/SuperAdminLayout.vue';
-import { Head } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
+import { ref, watch } from 'vue';
 
 const props = defineProps({
-    logList: {
-        type: Array,
-        default: () => [],
-    },
+    logList: { type: Object, default: () => ({ data: [], links: [] }) },
+    instansiOptions: { type: Array, default: () => [] },
+    aksiOptions: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
 });
 
-const instansiFilter = ref('');
-const aksiFilter = ref('');
-const tanggalMulai = ref('');
-const tanggalSelesai = ref('');
+const instansiFilter = ref(props.filters.instansiFilter || '');
+const aksiFilter = ref(props.filters.aksiFilter || '');
+const tanggalMulai = ref(props.filters.tanggalMulai || '');
+const tanggalSelesai = ref(props.filters.tanggalSelesai || '');
 
-const aksiOptions = [
-    'Terima Pengajuan',
-    'Tolak Pengajuan',
-    'Tambah Walk-in',
-    'Ubah Kuota',
-    'Ubah Status Bidang',
-    'Tambah Bidang',
-    'Tambah Instansi',
-    'Undang Admin',
-    'Edit Profil Instansi',
-];
+let filterTimeout = null;
+const applyFilters = () => {
+    clearTimeout(filterTimeout);
+    filterTimeout = setTimeout(() => {
+        router.get(
+            route('superadmin.audit-log.index'),
+            {
+                instansiFilter: instansiFilter.value,
+                aksiFilter: aksiFilter.value,
+                tanggalMulai: tanggalMulai.value,
+                tanggalSelesai: tanggalSelesai.value,
+            },
+            { preserveState: true, preserveScroll: true, replace: true }
+        );
+    }, 300);
+};
 
-const instansiOptions = computed(() => {
-    const names = props.logList.map((log) => log.instansi);
-    return [...new Set(names)];
-});
-
-const filteredLog = computed(() => {
-    return props.logList.filter((log) => {
-        const matchInstansi = !instansiFilter.value || log.instansi === instansiFilter.value;
-        const matchAksi = !aksiFilter.value || log.aksi === aksiFilter.value;
-        const matchDate = (!tanggalMulai.value || log.waktu.slice(0, 10) >= tanggalMulai.value) &&
-                          (!tanggalSelesai.value || log.waktu.slice(0, 10) <= tanggalSelesai.value);
-        return matchInstansi && matchAksi && matchDate;
-    });
-});
+watch([instansiFilter, aksiFilter, tanggalMulai, tanggalSelesai], applyFilters);
 
 const aksiBadge = (aksi) => {
     if (aksi === 'Tolak Pengajuan') return 'badge-danger';
@@ -96,7 +88,7 @@ const closeDetail = () => {
         <section class="glass-panel p-6 sm:p-8">
             <div class="mb-4 flex items-center justify-between">
                 <h3 class="font-display text-base font-bold text-ink-900">Jejak Aktivitas</h3>
-                <span class="badge badge-info">{{ filteredLog.length }} Entri</span>
+                <span class="badge badge-info">{{ logList.total }} Entri</span>
             </div>
 
             <div class="overflow-x-auto">
@@ -112,7 +104,7 @@ const closeDetail = () => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-ink-300/20">
-                        <tr v-for="log in filteredLog" :key="log.id" class="transition hover:bg-forest-50/60">
+                        <tr v-for="log in logList.data" :key="log.id" class="transition hover:bg-forest-50/60">
                             <td class="px-4 py-4 text-ink-500 whitespace-nowrap">{{ log.waktu }}</td>
                             <td class="px-4 py-4 font-medium text-ink-900">{{ log.user }}</td>
                             <td class="px-4 py-4">
@@ -128,13 +120,27 @@ const closeDetail = () => {
                                 </button>
                             </td>
                         </tr>
-                        <tr v-if="filteredLog.length === 0">
+                        <tr v-if="logList.data.length === 0">
                             <td colspan="6" class="px-4 py-10 text-center text-ink-500">
                                 Tidak ada aktivitas yang cocok dengan filter.
                             </td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination -->
+            <div v-if="logList.links && logList.links.length > 3" class="mt-6 flex flex-wrap items-center justify-center gap-1">
+                <template v-for="(link, idx) in logList.links" :key="idx">
+                    <div v-if="link.url === null" class="mr-1 mb-1 px-4 py-3 text-sm leading-4 text-ink-400 border rounded-lg bg-surface" v-html="link.label"></div>
+                    <button
+                        v-else
+                        class="mr-1 mb-1 px-4 py-3 text-sm leading-4 border rounded-lg transition-colors hover:bg-forest-50 hover:text-forest-700 focus:border-forest-500 focus:text-forest-700"
+                        :class="{'bg-forest-600 text-white font-medium hover:bg-forest-700 hover:text-white': link.active, 'bg-white text-ink-700': !link.active}"
+                        @click.prevent="router.get(link.url, {}, {preserveState: true, preserveScroll: true})"
+                        v-html="link.label"
+                    />
+                </template>
             </div>
         </section>
 
@@ -192,23 +198,19 @@ const closeDetail = () => {
                                 <thead class="border-b border-ink-300/35 bg-surface text-xs uppercase tracking-wider text-ink-500">
                                     <tr>
                                         <th class="px-4 py-2.5">Field</th>
-                                        <th class="px-4 py-2.5">Nilai Lama</th>
-                                        <th class="px-4 py-2.5">Nilai Baru</th>
+                                        <th class="px-4 py-2.5">Value</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-ink-300/20 bg-white/50">
-                                    <tr v-for="(perubahan, index) in detailLog.perubahan" :key="index">
-                                        <td class="px-4 py-3 font-medium text-ink-900">{{ perubahan.field }}</td>
-                                        <td class="px-4 py-3 text-status-danger">
-                                            <span class="inline-flex items-center rounded-md bg-status-danger/10 px-2 py-0.5 text-xs">{{ perubahan.old }}</span>
-                                        </td>
-                                        <td class="px-4 py-3 text-status-success">
-                                            <span class="inline-flex items-center rounded-md bg-status-success/10 px-2 py-0.5 text-xs">{{ perubahan.new }}</span>
+                                    <tr v-for="(value, key) in detailLog.perubahan" :key="key">
+                                        <td class="px-4 py-3 font-medium text-ink-900">{{ key }}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-block text-xs font-mono text-ink-700 break-all">{{ JSON.stringify(value) }}</span>
                                         </td>
                                     </tr>
-                                    <tr v-if="detailLog.perubahan.length === 0">
-                                        <td colspan="3" class="px-4 py-6 text-center text-ink-500">
-                                            Tidak ada data perubahan.
+                                    <tr v-if="Object.keys(detailLog.perubahan).length === 0">
+                                        <td colspan="2" class="px-4 py-6 text-center text-ink-500">
+                                            Tidak ada data perubahan/properties.
                                         </td>
                                     </tr>
                                 </tbody>
